@@ -202,3 +202,137 @@ kickoff §3.4 快照文件的形状 MUST 按原文登记：店铺/主体/负责�
 #### Scenario: Q4 短名是指标键下的 JSON 键
 - **WHEN** 读取一个二级指标键下的字段
 - **THEN** 其中有 `latest`、`over_peers`、`next_level`，并且这三项不改写成 `indicator_data_detail`、`indicator_data_over_peers_rate`、`indicator_data_next_level_threshold`
+
+### Requirement: 比率量纲
+已由用户批准从参考升格为契约。本需求是待裁决缺口。0~1 与 0~100 未统一，本需求不选取其中一套作为唯一量纲。
+
+已写出的句子同时保留：
+
+- kickoff §3.4：文件只存原始值（比率 0~100）。
+- kickoff §7.1：用户评价分 / 售罄健康分为分值、直通；其余 8 项比率指标为比例（0~1），×100 后再判定/展示；`over_peers_rate` / `next_level_threshold` 同指标量纲、同指标规则。
+- kickoff §7.3：除用户评价分、售罄健康分为分值外，8 项比率指标源表为 0~1 比例，展示需 ×100。
+- `.harness/domains/store-diagnosis-baseline.md`：比率类源值通常为 0~1，展示与判定统一换算为百分比；只有延迟发货率在语义层显式标注 scale 时也要全指标统一应用实测口径。
+
+#### Scenario: 两套量纲都在且不选取
+- **WHEN** 核对比率量纲
+- **THEN** 契约同时有「比率 0~100」和「比例（0~1）」以及 ×100，并且没有把其中一套写成唯一量纲
+
+### Requirement: 命中标注使用 thresholds.json
+已由用户批准从参考升格为契约。
+
+kickoff §3.4 写明：命中标注运行时按 thresholds.json 计算。
+
+#### Scenario: 命中标注不改写这句
+- **WHEN** 核对快照上的命中标注
+- **THEN** 契约写的是运行时按 thresholds.json 计算
+
+### Requirement: C-S09、C-S12、C-S13 阈值
+已由用户批准从参考升格为契约。本需求是待裁决缺口。来源给出两列数字，本需求不选取唯一值。
+
+kickoff §7.1 冲突表原文：
+
+| 指标 | 来源 A（报告模版） | 来源 B（影响文档） |
+|---|---|---|
+| 延迟发货率 (C-S09) | ≥ 10% | ≥ 2%（超同行 70%） |
+| 24h 回复率 (C-S12) | < 90% | < 100% |
+| 售后准时率 (C-S13) | < 95% | < 100% |
+
+症状规格另写「C-S09 ≥2%、C-S12 <90%、C-S13 <95%」。该句与上表并存，本需求不把它收成唯一验收常量。kickoff 冲突表的「以 B 为主 / 以 A 为主」也只按原文留在出处，本需求不采用为唯一值。
+
+#### Scenario: 两列阈值都保留
+- **WHEN** 核对这三项阈值
+- **THEN** 契约同时有 C-S09 的 ≥ 10% 与 ≥ 2%，C-S12 的 < 90% 与 < 100%，C-S13 的 < 95% 与 < 100%，并且没有唯一选中值
+
+### Requirement: 等级取值
+已由用户批准从参考升格为契约。
+
+两处原文都登记：
+
+- harness：≥4.3 优秀，≥4 正常，≥3.5 低危，<3.5 高危。
+- kickoff §7.3：<3.5 高危 / 3.5~4 低危 / 4~4.3 正常 / ≥4.3 优秀。店铺维度用店铺绩效分，主体维度用主体平均分。
+
+#### Scenario: 四档名称和切分数字都在
+- **WHEN** 核对等级取值
+- **THEN** 契约有高危、低危、正常、优秀，以及 3.5、4、4.3
+
+### Requirement: mall_check_score 与 perf_score
+已由用户批准从参考升格为契约。本需求是待裁决缺口。两者的关系是未裁决，本需求不合并字段。
+
+- harness 与 kickoff §7.1 字段表写出 `mall_check_score`，用途是店铺绩效分。harness 将它与 `score_level` 并列为绩效分与等级所用字段。
+- 已升格的快照形状写出 `perf_score`。
+- 来源没有写这两处是同一个字段。
+
+#### Scenario: 两个字段名都在且不合并
+- **WHEN** 对照绩效分的字段名
+- **THEN** 契约同时有 `mall_check_score` 和 `perf_score`，并且没有把它们写成同一个字段
+
+### Requirement: 无版本段
+已由用户批准从参考升格为契约。
+
+来源没有写出快照路径的版本段。路径保持 `{data_dir}/{shop_id}.json`。本需求登记为无版本段。
+
+#### Scenario: 路径没有版本段
+- **WHEN** 核对快照路径是否带版本段
+- **THEN** 契约写明无版本段，路径仍是 `{data_dir}/{shop_id}.json`
+
+### Requirement: 商品策略指标名
+来源写明商品策略指标名待补，没有给出指标名清单。本项阻断。不编造指标名。
+
+#### Scenario: 没有指标名清单
+- **WHEN** 核对商品策略指标名
+- **THEN** 契约写明阻断，并且没有商品策略指标名清单
+
+### Requirement: 履约表列名清单
+kickoff §7.2 写明 `dwm_robot_self_order_detail_df`（139 列）。来源没有这 139 个列名。本项登记为列名待完整清单，不编造列名。本项阻断。
+
+#### Scenario: 只有列数没有列名
+- **WHEN** 核对履约表列名
+- **THEN** 契约有「139 列」和「列名待完整清单」，并且没有逐列名单
+
+### Requirement: 售后六大类
+已由用户批准从参考升格为契约。升格的是来源已经写出的归并规则，不是六个类名。
+
+- harness：售后原因先按英文逗号拆分，再归并为固定 6 大类；映射表必须作为受控资产，不能由模型推断。
+- kickoff §7.3：售后 26 原因 → 6 大类。
+
+六个类名在来源中没有列出。类名清单阻断，不编造类名。
+
+#### Scenario: 归并规则按原文核对
+- **WHEN** 核对售后原因归并
+- **THEN** 契约有英文逗号拆分、固定 6 大类、26 原因 → 6 大类，以及映射表必须作为受控资产
+
+#### Scenario: 六个类名没有清单
+- **WHEN** 核对六个类名
+- **THEN** 契约写明类名清单阻断，并且没有六个类名
+
+### Requirement: 明细 Top 10
+已由用户批准从参考升格为契约。本需求是待裁决缺口。条数有两套写法，本需求不选取唯一条数。
+
+- kickoff §7.3：单据级明细只在 Excel（每店铺每类 Top 10）；报告正文只写结论 + 占比。同节另写 4 区块 × Top 10。
+- harness：明细默认 Top N，完整单据只进 Excel/附件，不进入 LLM 上下文。
+
+#### Scenario: 两条明细规则都保留
+- **WHEN** 核对明细条数
+- **THEN** 契约同时有「每店铺每类 Top 10」和「明细默认 Top N」，并且没有把其中一套写成唯一条数
+
+### Requirement: §3.4 的 run 切片、interpretation 与批次报告
+已由用户批准从参考升格为契约。
+
+kickoff §3.4 的三份形状按原文登记：
+
+1. run 切片（`workspace diagnosis/<item_id>/checklists/<checklist>.json`）：单店单检查单；追加 grade / individual_* / common_issues / metrics[].hit|is_common。
+2. interpretation 契约：headline / overall / findings[{title,severity,analysis,evidence[],data_refs[]}] / actions[{title,detail,priority?,owner_hint?}] / risks[]；data_refs 支持 `perf_score`、`metrics.<指标名|key>.<latest|prev|weight>`（label 与英文 key 双匹配）；value 必须与切片一致。
+3. 批次报告：mode(single|multi) + coverage + common_issues[]（影响度降序）+ priority[]（P0→P1→P2→共性）+ stores[] 分店章节；五段结构（概览/共性问题/店铺明细=症状+归因/行动建议/附录 FAIL·SKIPPED）。
+
+#### Scenario: 三份形状按原文核对
+- **WHEN** 核对这三份形状
+- **THEN** 契约含 run 切片路径、interpretation 的 headline / overall / findings / actions / risks，以及批次报告的 mode、coverage、common_issues、priority、stores 和五段结构
+
+### Requirement: prev、weight 与 over_peers、next_level
+已由用户批准从参考升格为契约。
+
+来源没有把 `prev` 写成 `over_peers` 的别名，也没有把 `weight` 写成 `next_level` 的别名。data_refs 路径中的 `latest|prev|weight` 与 Q4 短名 `latest` / `over_peers` / `next_level` 保持为两套词。本需求不合并这些键。
+
+#### Scenario: 两套词不合并
+- **WHEN** 对照 `prev` 与 `over_peers`，以及 `weight` 与 `next_level`
+- **THEN** 契约写明它们不是别名，并且没有把两边收成同一个键
