@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from octop.infra.db.pool import DatabasePool
 from octop.infra.db.repos._base import DbRow, map_rows, now_ts, sql_in_placeholders
+from octop.infra.errors import ErrorCode, OctopError
 
 _IN_FLIGHT_ITEM_STATUSES = ("PREPARING", "DIAGNOSING")
 _RESUMABLE_ITEM_STATUS = "PENDING"
@@ -107,13 +108,59 @@ class DiagnosisRunsRepo:
             raise RuntimeError("inserted diagnosis run was not readable")
         return found
 
-    def get_by_client_request_id(self, client_request_id: str) -> DiagnosisRunRow | None:
+    def get_by_client_request_id(
+        self,
+        client_request_id: str,
+        *,
+        owner_user_id: int | None = None,
+    ) -> DiagnosisRunRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM diag_runs WHERE client_request_id = ?",
                 (client_request_id,),
             ).fetchone()
+        if row is None:
+            return None
+        found = DiagnosisRunRow.from_row(row)
+        if owner_user_id is not None and found.owner_user_id != owner_user_id:
+            raise OctopError(ErrorCode.FORBIDDEN, "diagnosis run is not accessible")
+        return found
+
+    def get_run(self, run_id: str) -> DiagnosisRunRow | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM diag_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
         return DiagnosisRunRow.from_row(row) if row is not None else None
+
+    def list_runs(self) -> list[DiagnosisRunRow]:
+        with self._db.connect() as conn:
+            rows = conn.execute("SELECT * FROM diag_runs ORDER BY id").fetchall()
+        return map_rows(rows, DiagnosisRunRow)
+
+    def list_items(self, run_id: str) -> list[DiagnosisRunItemRow]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM diag_run_items WHERE run_id = ? ORDER BY id",
+                (run_id,),
+            ).fetchall()
+        return map_rows(rows, DiagnosisRunItemRow)
+
+    def update_run_status(self, run_id: str, status: str) -> None:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE diag_runs SET status = ? WHERE run_id = ?",
+                (status, run_id),
+            )
+
+    def cancel_unfinished_items(self, run_id: str) -> None:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE diag_run_items SET status = ? "
+                "WHERE run_id = ? AND status NOT IN ('OK', 'FAILED', 'SKIPPED', 'CANCELLED')",
+                ("CANCELLED", run_id),
+            )
 
     def list_runs_for_owner(self, owner_user_id: int) -> list[DiagnosisRunRow]:
         with self._db.connect() as conn:
