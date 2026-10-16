@@ -13,6 +13,8 @@ Surface:
 - ``retry_policy(node) -> Mapping`` — written timeout; ``max_attempts`` only where a count is written
 - ``run_with_retry(node, action) -> Mapping`` — ``failed``, ``attempts``, ``events``; ``state`` is FAILED when exhausted
 - ``DiagnosisOrchestrator`` — flow A gate, zero LLM, idempotency, resume, caller-set limit
+- ``reset_orphan_items`` — startup resets a DIAGNOSING crash and continues
+- ``contract_gate`` — conclusion-schema or data_refs failure is recorded as FAIL
 """
 
 from __future__ import annotations
@@ -186,8 +188,8 @@ def test_injected_analysis_port_replaces_the_default_conclusion() -> None:
     assert result["analysis_called"] is True
 
 
-def test_contract_gate_does_not_analyze_or_look_like_a_timeout() -> None:
-    """预加载不是 COMPLETED 且行数大于 0 时，不进入分析，也不记成超时重试。"""
+def test_preload_failure_is_not_the_contract_gate() -> None:
+    """预加载未通过时不进入分析，也不把这件事记成契约门禁。"""
     seen = {"n": 0}
 
     def analysis(text: str) -> str:
@@ -215,8 +217,51 @@ def test_contract_gate_does_not_analyze_or_look_like_a_timeout() -> None:
         assert result["state"] == "PREPARING"
         assert result["stages"] == ["PREPARING"]
         events = _events(result)
+        assert events
         assert all(event.get("reason") != "timeout" for event in events)
-        assert any(event.get("kind") == "contract_gate" for event in events)
+        assert all(event.get("kind") != "contract_gate" for event in events)
+
+
+def test_contract_gate_records_schema_and_data_ref_failures_as_fail() -> None:
+    """结论 schema 或 data_refs 对不上时，契约门禁记 FAIL。"""
+    gate = _fn("contract_gate")
+    schema = _mapping(gate(conclusion_schema_ok=False, cited_values=("12",), slice_values=("12",)))
+    refs = _mapping(gate(conclusion_schema_ok=True, cited_values=("99",), slice_values=("12",)))
+    ok = _mapping(gate(conclusion_schema_ok=True, cited_values=("12",), slice_values=("12", "4")))
+    for failed, flag in ((schema, "conclusion_schema"), (refs, "data_refs")):
+        assert failed["result"] == "FAIL"
+        events = _events(failed)
+        assert events[0]["kind"] == "contract_gate"
+        assert events[0]["result"] == "FAIL"
+        assert events[0][flag] is True
+    assert ok["result"] == "OK"
+    assert all(event.get("result") != "FAIL" for event in _events(ok))
+
+
+def test_startup_resumes_a_diagnosing_crash() -> None:
+    """启动调用 reset_orphan_items，DIAGNOSING 崩溃可以续跑，且不从头进入 PREPARING。"""
+    try:
+        orch = _orchestrator(attribution_limit=3, orphans=(_diagnosing_orphan(),))
+    except TypeError as exc:
+        pytest.fail(f"startup does not accept a DIAGNOSING crash ({exc})")
+    if not callable(getattr(orch, "reset_orphan_items", None)):
+        pytest.fail("reset_orphan_items is not implemented")
+    if getattr(orch, "reset_orphan_calls", 0) < 1:
+        pytest.fail("startup did not call reset_orphan_items")
+    result = _submit(orch, client_request_id="diag-crash", stores=("s1", "s2"))
+    assert result["stages"] == ["DIAGNOSING", "COMPLETING", "COMPLETED"]
+    assert result["state"] == "COMPLETED"
+    assert result["conclusion"] == "快照原文"
+    assert result["llm_calls"] == 0
+    assert [item["store_id"] for item in result["items"]] == ["s1"]
+    assert result["items"][0]["state"] == "OK"
+    assert any(event.get("kind") == "reset_orphan_items" for event in _events(result))
+    orch.reset_orphan_items()
+    again = _submit(orch, client_request_id="diag-crash", stores=("s9",))
+    assert again["run_id"] == result["run_id"]
+    assert again["stages"] == result["stages"]
+    assert list(again["events"]) == list(result["events"])
+    assert [item["store_id"] for item in again["items"]] == ["s1"]
 
 
 def test_client_request_id_returns_the_same_run_without_new_items() -> None:
@@ -263,6 +308,15 @@ def test_attribution_limit_rejects_the_next_acquire() -> None:
     wider = _orchestrator(attribution_limit=5)
     assert [wider.try_acquire_attribution() for _ in range(5)] == [True, True, True, True, True]
     assert wider.try_acquire_attribution() is False
+
+
+def _diagnosing_orphan() -> dict[str, Any]:
+    return {
+        "client_request_id": "diag-crash",
+        "state": "DIAGNOSING",
+        "snapshot_text": "快照原文",
+        "items": ({"store_id": "s1", "state": "DIAGNOSING"},),
+    }
 
 
 def _orchestrator(**kwargs: Any) -> Any:
