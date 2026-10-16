@@ -1,0 +1,251 @@
+"""Flow B attribution.
+
+Stage 1 builds context without an LLM. Stage 2 may call an LLM only to
+produce an interpretation, then the existing contract gate decides FAIL.
+Skill asset names and report headings are the ones already written in the
+spec. SOUL step names are not invented here.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
+
+from octop.infra.diagnosis.l1_semantic import yellow_metric_names
+from octop.infra.diagnosis.orchestrator import contract_gate, retry_policy
+from octop.infra.diagnosis.pop_rules import ratio_pop
+
+_SKILL_ASSETS: tuple[str, ...] = (
+    "metrics_catalog",
+    "analysis_guide",
+    "drilldown_playbook",
+    "query_tasks",
+)
+_CAUSAL_LINKS: tuple[str, ...] = ("越阈指标", "业务后果", "绩效影响", "平台后果")
+_UNVERIFIED = "待验证"
+_REPORT_SECTIONS: tuple[str, ...] = (
+    "〇 执行摘要",
+    "一 共性问题",
+    "二 特别情况店铺",
+    "三 共性店铺",
+    "四 整改优先级",
+    "五 逐店明细",
+)
+_TOP_KEYS: tuple[str, ...] = ("headline", "overall", "findings", "actions", "risks")
+_FINDING_KEYS: tuple[str, ...] = ("title", "severity", "analysis", "evidence", "data_refs")
+_ACTION_KEYS: tuple[str, ...] = ("title", "detail")
+_STAGE2_TIMEOUT_SECONDS = 600
+
+
+def skill_assets() -> tuple[str, ...]:
+    """The four skill asset names. ``metrics_catalog`` is the fact source."""
+    return _SKILL_ASSETS
+
+
+def load_skills() -> tuple[dict[str, Any], ...]:
+    """Name the four assets. Their bodies are not invented."""
+    return tuple(
+        {
+            "name": name,
+            "body": "",
+            "fact_source": name == "metrics_catalog",
+        }
+        for name in _SKILL_ASSETS
+    )
+
+
+def soul_steps() -> tuple[str, ...]:
+    """SOUL step titles are not written in the spec."""
+    return ()
+
+
+def causal_chain_links() -> tuple[str, ...]:
+    """The four links in the written causal-chain pattern."""
+    return _CAUSAL_LINKS
+
+
+def unverified_mark() -> str:
+    """Mark for a causal link that has no supporting data."""
+    return _UNVERIFIED
+
+
+def report_sections() -> tuple[str, ...]:
+    """Report headings from the attribution spec, in order."""
+    return _REPORT_SECTIONS
+
+
+def stage1_policy() -> Mapping[str, int]:
+    """段1 uses the existing diagnose 段1 retry row."""
+    return retry_policy("diagnose 段1")
+
+
+def stage2_timeout_seconds() -> int:
+    """段2 budget written in the attribution spec. It has no attempt count."""
+    return _STAGE2_TIMEOUT_SECONDS
+
+
+def stage1_context(
+    *,
+    metrics: Sequence[Mapping[str, Any]],
+    current_numerators: Sequence[float],
+    current_denominators: Sequence[float],
+    previous_numerators: Sequence[float] | None,
+    previous_denominators: Sequence[float] | None,
+) -> dict[str, Any]:
+    """Period-total ratio context. Yellow metrics contribute no value."""
+    yellow = set(yellow_metric_names())
+    values: dict[str, Any] = {}
+    for metric in metrics:
+        name = str(metric["name"])
+        if name in yellow:
+            continue
+        values[name] = metric.get("value")
+    return {
+        "llm_calls": 0,
+        "pop": ratio_pop(
+            current_numerators,
+            current_denominators,
+            previous_numerators,
+            previous_denominators,
+        ),
+        "uses_daily_rate_mean": False,
+        "sessions": (),
+        "values": values,
+    }
+
+
+def diagnose_item(
+    *,
+    run_id: str,
+    store_id: str,
+    attempt: int,
+    conclusion: Mapping[str, Any] | None,
+    slice_values: Sequence[object],
+    prior_threads: Sequence[str] = (),
+    metrics: Sequence[str] = (),
+    llm: Callable[[], Any] | None = None,
+) -> dict[str, Any]:
+    """Run 段2 interpretation under the existing contract gate.
+
+    A yellow-only metric list does not open a thread and does not call the
+    LLM. A gate FAIL keeps the current thread and adds ``attempt + 1``.
+    """
+    if metrics and set(metrics) <= set(yellow_metric_names()):
+        return {
+            "status": "SKIPPED",
+            "result": "OK",
+            "events": (),
+            "attempt": attempt,
+            "threads": (),
+            "llm_calls": 0,
+            "stage1_llm_calls": 0,
+        }
+
+    produced, llm_calls = _interpret(conclusion, llm)
+    gate = contract_gate(
+        conclusion_schema_ok=_schema_ok(produced),
+        cited_values=_cited(produced),
+        slice_values=slice_values,
+    )
+    threads = [str(name) for name in prior_threads]
+    _remember(threads, _thread_name(run_id, store_id, attempt))
+    next_attempt = attempt
+    if gate["result"] == "FAIL":
+        next_attempt = attempt + 1
+        _remember(threads, _thread_name(run_id, store_id, next_attempt))
+    status = "FAILED" if gate["result"] == "FAIL" else "OK"
+    return {
+        "status": status,
+        "result": gate["result"],
+        "events": tuple(gate["events"]),
+        "attempt": next_attempt,
+        "threads": tuple(threads),
+        "llm_calls": llm_calls,
+        "stage1_llm_calls": 0,
+    }
+
+
+def synthesize_report(
+    items: Sequence[Mapping[str, Any]],
+    *,
+    summarize_failed: bool = False,
+) -> dict[str, Any]:
+    """Five written headings, or a status list when summarize fails."""
+    appendix = tuple(
+        str(item["store_id"]) for item in items if item["status"] in {"FAILED", "SKIPPED"}
+    )
+    partial = any(item["status"] == "FAILED" for item in items)
+    if summarize_failed:
+        lines = tuple(f"{item['store_id']} {item['status']}" for item in items)
+        return {
+            "degraded": True,
+            "sections": (),
+            "appendix": appendix,
+            "partial": partial,
+            "lines": lines,
+        }
+    return {
+        "degraded": False,
+        "sections": _REPORT_SECTIONS,
+        "appendix": appendix,
+        "partial": partial,
+        "lines": (),
+    }
+
+
+def _interpret(
+    conclusion: Mapping[str, Any] | None,
+    llm: Callable[[], Any] | None,
+) -> tuple[Mapping[str, Any], int]:
+    if llm is None:
+        return (conclusion or {}, 0)
+    produced = llm()
+    if not isinstance(produced, Mapping):
+        return ({}, 1)
+    return (produced, 1)
+
+
+def _schema_ok(conclusion: Mapping[str, Any]) -> bool:
+    for key in _TOP_KEYS:
+        if key not in conclusion:
+            return False
+    if not _is_sequence(conclusion["findings"]) or not _is_sequence(conclusion["actions"]):
+        return False
+    if not _is_sequence(conclusion["risks"]):
+        return False
+    if any(not _has_keys(finding, _FINDING_KEYS) for finding in conclusion["findings"]):
+        return False
+    if any(not _has_keys(action, _ACTION_KEYS) for action in conclusion["actions"]):
+        return False
+    return all(link in conclusion for link in _CAUSAL_LINKS)
+
+
+def _cited(conclusion: Mapping[str, Any]) -> tuple[object, ...]:
+    findings = conclusion.get("findings", ())
+    if not _is_sequence(findings):
+        return ()
+    cited: list[object] = []
+    for finding in findings:
+        if not isinstance(finding, Mapping):
+            continue
+        refs = finding.get("data_refs", ())
+        if _is_sequence(refs):
+            cited.extend(refs)
+    return tuple(cited)
+
+
+def _has_keys(value: object, keys: tuple[str, ...]) -> bool:
+    return isinstance(value, Mapping) and all(key in value for key in keys)
+
+
+def _is_sequence(value: object) -> bool:
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes))
+
+
+def _thread_name(run_id: str, store_id: str, attempt: int) -> str:
+    return f"diag:{run_id}:{store_id}:a{attempt}"
+
+
+def _remember(threads: list[str], name: str) -> None:
+    if name not in threads:
+        threads.append(name)
