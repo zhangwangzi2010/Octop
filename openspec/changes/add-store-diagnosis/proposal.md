@@ -23,6 +23,7 @@
 - `diagnosis-attribution`: 流程 B 归因下钻（分流、两段式 diagnose、契约门禁、报告五段合成）
 - `diagnosis-api`: 店铺诊断 HTTP 面（/api/diagnosis/runs 提交/查询/取消、幂等与权限）
 - `diagnosis-dashboard`: 诊断中心界面（发起、Run 列表、详情、报告、追问）
+- `diagnosis-fetch-fields`: 两级取数展示名与需求 6.3 四类下钻名称。不含 JSON 键、文件路径、比率量纲、SQL 列
 
 ### Modified Capabilities
 
