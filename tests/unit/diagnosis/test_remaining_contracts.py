@@ -17,15 +17,16 @@ Expected surface once the module exists:
 - ``data_ref_words() -> Sequence[str]``
 - ``q4_short_names() -> Sequence[str]``
 - ``is_alias(left, right) -> bool``
-- ``ratio_scale_statements() -> Sequence[str]``
-- ``chosen_ratio_scale() -> None``
-- ``threshold_statements() -> Sequence[str]``
-- ``chosen_threshold_set() -> None``
-- ``score_field_names() -> Sequence[str]``
-- ``chosen_score_field() -> None``
-- ``score_fields_are_same() -> bool``
-- ``detail_limit_statements() -> Sequence[str]``
-- ``chosen_detail_limit() -> None``
+- ``chosen_ratio_scale() -> str`` — ``0~1``
+- ``ratio_display_multiplier() -> int`` — ``100``
+- ``score_passthrough_metrics() -> Sequence[str]``
+- ``chosen_threshold_set() -> Sequence[str]``
+- ``threshold_notes() -> Sequence[str]``
+- ``chosen_score_field() -> str`` — ``mall_check_score``
+- ``score_field_alias() -> str`` — ``perf_score``
+- ``chosen_detail_limit() -> str``
+- ``top10_is_hard_cap() -> bool``
+- ``top10_reference_n() -> int``
 """
 
 from __future__ import annotations
@@ -69,23 +70,20 @@ BATCH_REPORT_CONTRACT = (
 )
 DATA_REF_WORDS = ("latest", "prev", "weight")
 Q4_SHORT_NAMES = ("latest", "over_peers", "next_level")
-RATIO_SCALE_STATEMENTS = (
-    "文件只存原始值（比率 0~100）。",
-    "用户评价分 / 售罄健康分为分值、直通；其余 8 项比率指标为比例（0~1），×100 后再判定/展示；over_peers_rate / next_level_threshold 同指标量纲、同指标规则。",
-    "除用户评价分、售罄健康分为分值外，8 项比率指标源表为 0~1 比例，展示需 ×100。",
-    "比率类源值通常为 0~1，展示与判定统一换算为百分比；只有延迟发货率在语义层显式标注 scale 时也要全指标统一应用实测口径。",
-)
-THRESHOLD_STATEMENTS = (
-    "延迟发货率 (C-S09) 来源 A ≥ 10%；来源 B ≥ 2%（超同行 70%）",
-    "24h 回复率 (C-S12) 来源 A < 90%；来源 B < 100%",
-    "售后准时率 (C-S13) 来源 A < 95%；来源 B < 100%",
+CHOSEN_RATIO_SCALE = "0~1"
+RATIO_DISPLAY_MULTIPLIER = 100
+SCORE_PASSTHROUGH_METRICS = ("用户评价分", "售罄健康分")
+ACCEPTANCE_THRESHOLDS = ("C-S09 ≥10%", "C-S12 <90%", "C-S13 <95%")
+THRESHOLD_NOTES = (
+    "C-S09 ≥2%（超同行 70%）",
+    "C-S12 <100%",
+    "C-S13 <100%",
     "C-S09 ≥2%、C-S12 <90%、C-S13 <95%",
 )
-SCORE_FIELD_NAMES = ("mall_check_score", "perf_score")
-DETAIL_LIMIT_STATEMENTS = (
-    "单据级明细只在 Excel（每店铺每类 Top 10）；报告正文只写结论 + 占比。同节另写 4 区块 × Top 10。",
-    "明细默认 Top N，完整单据只进 Excel/附件，不进入 LLM 上下文。",
-)
+CANONICAL_SCORE_FIELD = "mall_check_score"
+SCORE_FIELD_ALIAS = "perf_score"
+CHOSEN_DETAIL_LIMIT = "默认 Top N + 完整进附件"
+TOP10_REFERENCE_N = 10
 
 
 def test_hit_annotation_uses_thresholds_json() -> None:
@@ -145,46 +143,37 @@ def test_prev_and_weight_are_not_aliases() -> None:
     assert "weight" not in metric_value_keys()
 
 
-def test_ratio_scale_records_both_statements_without_choosing() -> None:
-    """0~1 与 0~100 都留下，不选唯一量纲。"""
-    statements = _texts("ratio_scale_statements")
-    assert statements == RATIO_SCALE_STATEMENTS
-    combined = " ".join(statements)
-    assert "比率 0~100" in combined
-    assert "比例（0~1）" in combined
-    assert "×100" in combined
-    assert _fn("chosen_ratio_scale")() is None
+def test_ratio_scale_stores_zero_to_one_and_displays_times_100() -> None:
+    """内部保存 0~1。展示和判定 ×100。两个分值直通。"""
+    assert _fn("chosen_ratio_scale")() == CHOSEN_RATIO_SCALE
+    assert _fn("ratio_display_multiplier")() == RATIO_DISPLAY_MULTIPLIER
+    assert _texts("score_passthrough_metrics") == SCORE_PASSTHROUGH_METRICS
+    assert _fn("chosen_ratio_scale")() != "0~100"
 
 
-def test_threshold_columns_stay_unresolved() -> None:
-    """两列阈值和症状规格那句都保留，不选唯一验收常量。"""
-    statements = _texts("threshold_statements")
-    assert statements == THRESHOLD_STATEMENTS
-    combined = " ".join(statements)
-    assert "≥ 10%" in combined
-    assert "≥ 2%" in combined
-    assert "< 90%" in combined
-    assert "< 100%" in combined
-    assert "< 95%" in combined
-    assert "C-S09 ≥2%、C-S12 <90%、C-S13 <95%" in combined
-    assert _fn("chosen_threshold_set")() is None
+def test_threshold_acceptance_is_source_a_only() -> None:
+    """验收只有 ≥10% / <90% / <95%。来源 B 和旧症状列只是注记。"""
+    chosen = _fn("chosen_threshold_set")()
+    assert chosen == ACCEPTANCE_THRESHOLDS
+    notes = _texts("threshold_notes")
+    assert notes == THRESHOLD_NOTES
+    assert "C-S09 ≥2%" not in chosen
+    assert "<100%" not in chosen
+    assert "C-S09 ≥2%、C-S12 <90%、C-S13 <95%" not in chosen
 
 
-def test_mall_check_score_is_not_merged_into_perf_score() -> None:
-    """两个字段名都在，不合并，也不选取其中一个。"""
-    assert _texts("score_field_names") == SCORE_FIELD_NAMES
-    assert _fn("chosen_score_field")() is None
-    assert _fn("score_fields_are_same")() is False
+def test_mall_check_score_is_the_canonical_field() -> None:
+    """规范名是 mall_check_score。perf_score 是别名 / 旧键。"""
+    assert _fn("chosen_score_field")() == CANONICAL_SCORE_FIELD
+    assert _fn("score_field_alias")() == SCORE_FIELD_ALIAS
+    assert _fn("chosen_score_field")() != SCORE_FIELD_ALIAS
 
 
-def test_detail_limits_record_both_statements_without_choosing() -> None:
-    """Top 10 与 Top N 都留下，不选唯一条数。"""
-    statements = _texts("detail_limit_statements")
-    assert statements == DETAIL_LIMIT_STATEMENTS
-    combined = " ".join(statements)
-    assert "每店铺每类 Top 10" in combined
-    assert "明细默认 Top N" in combined
-    assert _fn("chosen_detail_limit")() is None
+def test_detail_limit_is_default_top_n_plus_attachments() -> None:
+    """验收是默认 Top N 加完整进附件。Top 10 不是写死上限。"""
+    assert _fn("chosen_detail_limit")() == CHOSEN_DETAIL_LIMIT
+    assert _fn("top10_is_hard_cap")() is False
+    assert _fn("top10_reference_n")() == TOP10_REFERENCE_N
 
 
 def _texts(name: str) -> tuple[str, ...]:
