@@ -23,7 +23,8 @@
 - `diagnosis-attribution`: 流程 B 归因下钻（分流、两段式 diagnose、契约门禁、报告五段合成）
 - `diagnosis-api`: 店铺诊断 HTTP 面（/api/diagnosis/runs 提交/查询/取消、幂等与权限）
 - `diagnosis-dashboard`: 诊断中心界面（发起、Run 列表、详情、报告、追问）
-- `diagnosis-fetch-fields`: 两级取数展示名与需求 6.3 四类下钻名称。不含 JSON 键、文件路径、比率量纲、SQL 列
+- `diagnosis-fetch-fields`: 两级取数展示名与需求 6.3 四类下钻名称。展示名本身不含 JSON 键、文件路径、比率量纲
+- `diagnosis-promoted-contracts`: 已由用户批准从参考升格为契约的一店一文件约定、十项二级指标名、Q4 的 latest / over_peers / next_level，以及评价 / 售后 / 发货 / 到货四类明细。路径片段、比率量纲、商品策略指标名不在该契约中
 
 ### Modified Capabilities
 
