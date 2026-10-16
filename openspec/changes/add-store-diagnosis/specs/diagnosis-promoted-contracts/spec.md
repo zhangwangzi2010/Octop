@@ -5,15 +5,15 @@
 
 快照落库 MUST 遵循一店一文件（schema v2）。症状规格「快照与可重放」与 `proposal.md` 写的是「一店一文件快照（schema v2）」。kickoff §7.5 写的是「一店一文件 schema v2」。`.harness/domains/store-diagnosis-baseline.md` 把这次写入称为「版本化快照」。
 
-本契约的路径约定停在上述原文：每家店铺一份 schema v2 快照。已读来源没有写出目录、文件名模板、后缀或版本路径段。
+本契约的路径约定停在上述原文：每家店铺一份 schema v2 快照。kickoff §3.4 已写出的快照文件路径是 `{data_dir}/{shop_id}.json`。已由用户批准从参考升格为契约。该句不带版本路径段。
 
 #### Scenario: 每店一份快照
 - **WHEN** 两家店铺各自完成取数落库
 - **THEN** 每家店铺各有一份 schema v2 快照
 
-#### Scenario: 路径约定不含未写出的片段
+#### Scenario: 快照路径使用已写出的模板
 - **WHEN** 核对一店一文件的路径约定
-- **THEN** 契约文本是一店一文件（schema v2）与版本化快照，其中没有目录、文件名模板、后缀或版本路径段
+- **THEN** 路径是 `{data_dir}/{shop_id}.json`，并且没有版本路径段
 
 ### Requirement: 十项二级指标名
 已由用户批准从参考升格为契约。
