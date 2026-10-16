@@ -170,6 +170,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "name": "onnx",
         "description": "Local ONNX / fastembed embedding service: enable, catalog, and download.",
     },
+    {
+        "name": "diagnosis",
+        "description": "Store-diagnosis runs: create, list, detail, and cancel.",
+    },
 ]
 
 _BEARER_SCHEME = {
