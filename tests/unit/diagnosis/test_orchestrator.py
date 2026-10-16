@@ -1,18 +1,18 @@
-"""RED contracts for the diagnosis run state machine and node retry table.
+"""Contracts for the diagnosis run state machine, retry table, and flow A spine.
 
-``octop.infra.diagnosis.orchestrator`` does not exist yet. These tests fail
-because that API is absent. Stage names and timeout budgets are the ones
-already written in the orchestration spec and WT-2 task list. This file does
-not invent a fifth English stage name, a summarize retry count, symptom
-rules, hit lines, or thresholds.
+Stage names and timeout budgets are the ones already written in the
+orchestration spec and WT-2 task list. These tests do not invent a fifth
+English stage name, a summarize retry count, symptom rules, hit lines, or
+thresholds.
 
-Expected surface once the module exists:
+Surface:
 
 - ``stage_names() -> Sequence[str]`` — PREPARING / ANALYZING / DIAGNOSING / COMPLETING / 终态
 - ``terminal_states() -> Sequence[str]`` — COMPLETED / PARTIAL / FAILED / CANCELLED
 - ``move(current, target) -> Mapping`` — ``accepted``, ``state``, ``events``
 - ``retry_policy(node) -> Mapping`` — written timeout; ``max_attempts`` only where a count is written
 - ``run_with_retry(node, action) -> Mapping`` — ``failed``, ``attempts``, ``events``; ``state`` is FAILED when exhausted
+- ``DiagnosisOrchestrator`` — flow A gate, zero LLM, idempotency, resume, caller-set limit
 """
 
 from __future__ import annotations
@@ -159,6 +159,124 @@ def test_diagnose_segment_one_two_timeouts_fail_the_run() -> None:
     assert result["failed"] is True
     assert result["state"] == "FAILED"
     assert result["attempts"] == 2
+
+
+def test_flow_a_is_zero_llm_and_skips_diagnosing() -> None:
+    """流程 A 不调用 LLM，依次经过 PREPARING、ANALYZING、COMPLETING 后进入 COMPLETED。"""
+    calls: list[object] = []
+
+    def llm(*_args: object, **_kwargs: object) -> None:
+        calls.append("called")
+
+    orch = _orchestrator(attribution_limit=3, llm=llm)
+    result = _submit(orch, client_request_id="flow-a", stores=("s1",))
+    assert calls == []
+    assert result["llm_calls"] == 0
+    assert result["stages"] == ["PREPARING", "ANALYZING", "COMPLETING", "COMPLETED"]
+    assert result["state"] == "COMPLETED"
+    assert result["conclusion"] == "快照原文"
+    assert orch.attribution_held == 0
+
+
+def test_injected_analysis_port_replaces_the_default_conclusion() -> None:
+    """分析口可以替换默认的快照结论回显。"""
+    orch = _orchestrator(attribution_limit=3, analysis=lambda text: f"port:{text}")
+    result = _submit(orch, client_request_id="port", stores=("s1",))
+    assert result["conclusion"] == "port:快照原文"
+    assert result["analysis_called"] is True
+
+
+def test_contract_gate_does_not_analyze_or_look_like_a_timeout() -> None:
+    """预加载不是 COMPLETED 且行数大于 0 时，不进入分析，也不记成超时重试。"""
+    seen = {"n": 0}
+
+    def analysis(text: str) -> str:
+        seen["n"] += 1
+        return text
+
+    orch = _orchestrator(attribution_limit=3, analysis=analysis)
+    running = _submit(
+        orch,
+        client_request_id="running",
+        stores=("s1",),
+        preload_status="RUNNING",
+        row_count=4,
+    )
+    empty = _submit(
+        orch,
+        client_request_id="empty",
+        stores=("s1",),
+        preload_status="COMPLETED",
+        row_count=0,
+    )
+    assert seen["n"] == 0
+    for result in (running, empty):
+        assert result["analysis_called"] is False
+        assert result["state"] == "PREPARING"
+        assert result["stages"] == ["PREPARING"]
+        events = _events(result)
+        assert all(event.get("reason") != "timeout" for event in events)
+        assert any(event.get("kind") == "contract_gate" for event in events)
+
+
+def test_client_request_id_returns_the_same_run_without_new_items() -> None:
+    """同一个 client_request_id 返回既有 run，不追加店铺 item。"""
+    orch = _orchestrator(attribution_limit=3)
+    first = _submit(orch, client_request_id="same", stores=("s1",))
+    second = _submit(orch, client_request_id="same", stores=("s1", "s2"))
+    assert first["run_id"] == second["run_id"]
+    assert [item["store_id"] for item in second["items"]] == ["s1"]
+
+
+def test_resume_from_analyzing_does_not_reenter_preparing() -> None:
+    """从 ANALYZING 断点续跑，不再进入 PREPARING。"""
+    orch = _orchestrator(attribution_limit=5)
+    result = _submit(
+        orch,
+        client_request_id="resume",
+        stores=("s1",),
+        snapshot_text="续跑",
+        checkpoint="ANALYZING",
+    )
+    assert result["stages"] == ["ANALYZING", "COMPLETING", "COMPLETED"]
+    assert result["state"] == "COMPLETED"
+    assert result["conclusion"] == "续跑"
+    again = _submit(
+        orch,
+        client_request_id="resume",
+        stores=("s1", "s9"),
+        checkpoint="PREPARING",
+    )
+    assert again["run_id"] == result["run_id"]
+    assert again["stages"] == ["ANALYZING", "COMPLETING", "COMPLETED"]
+
+
+def test_attribution_limit_rejects_the_next_acquire() -> None:
+    """归因槽由调用方指定为 3 或 5；纯数据节点不占槽。"""
+    limited = _orchestrator(attribution_limit=3)
+    assert [limited.try_acquire_attribution() for _ in range(3)] == [True, True, True]
+    assert limited.try_acquire_attribution() is False
+    held = limited.attribution_held
+    limited.run_data_node("ensure_data_ready")
+    assert limited.attribution_held == held
+
+    wider = _orchestrator(attribution_limit=5)
+    assert [wider.try_acquire_attribution() for _ in range(5)] == [True, True, True, True, True]
+    assert wider.try_acquire_attribution() is False
+
+
+def _orchestrator(**kwargs: Any) -> Any:
+    return _fn("DiagnosisOrchestrator")(**kwargs)
+
+
+def _submit(orch: Any, **kwargs: Any) -> Mapping[str, Any]:
+    payload: dict[str, Any] = {
+        "preload_status": "COMPLETED",
+        "row_count": 1,
+        "snapshot_text": "快照原文",
+    }
+    payload.update(kwargs)
+    return _mapping(orch.submit(**payload))
 
 
 def _timeouts(count: int) -> Callable[[], str]:
