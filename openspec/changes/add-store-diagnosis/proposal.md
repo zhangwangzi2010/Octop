@@ -1,6 +1,6 @@
 ## Why
 
-运营数据在 MaxCompute，店铺销量下滑诊断目前依赖人工、口径不一、费时。飞书需求 V1.0 与架构方案（整合版 v1.0）已冻结"双流程"蓝图：需要在不破坏 Octop 模块边界的前提下，把"定时症状管线（零 LLM）+ 归因下钻（LLM 参与）"从 Dify 工作流迁移为 Octop 内生能力，实现"接得进、诊得准、管得住"。
+运营数据在 MaxCompute，店铺销量下滑诊断目前依赖人工、口径不一、费时。飞书需求 V1.0 给出双流程验收边界；架构 wiki 只作可能不完整的框架参考，不阻塞验收。需要在不破坏 Octop 模块边界的前提下，把"定时症状管线（零 LLM）+ 归因下钻（LLM 参与）"从 Dify 工作流迁移为 Octop 内生能力，实现"接得进、诊得准、管得住"。
 
 ## What Changes
 
@@ -11,7 +11,8 @@
 - 新增 API `/api/diagnosis/runs` 系列：提交幂等（client_request_id）、owner 隔离、Scalar 文档可读
 - 新增 Dashboard 诊断中心：发起 / Run 列表 / 详情（items、阶段、失败原因）/ 报告渲染 / 追问
 - 注册 store-perf MCP connector（get_data_latest / submit_preload / run_analysis / drill_metric / get_report）；沉淀 4 份 Skill 资产（metrics_catalog / analysis_guide / drilldown_playbook / query_tasks）与诊断专家 Agent
-- 沉淀测试资产：症状引擎手算单测、fake-agent 全链路集成、Playwright 关键路径 E2E、UAT 检查表
+- 沉淀测试资产：症状引擎手算单测、fake-agent 全链路集成、Playwright 关键路径 E2E。需求文档当前状态为待评审，正文没有 UAT / 验收 / Done / U1–U10，本 change 不编写该检查表
+- 飞书看板黄格暂不可取数（`fetchable=false`）：库存、推广 roas、流量异常（建议调价未调价）、流量异常SPU数占比、推广 Roas。其余诊断范围内指标按 data_agent 语义层与受控 SQL 模板取数，不移植 RAG 运行时
 
 ## Capabilities
 

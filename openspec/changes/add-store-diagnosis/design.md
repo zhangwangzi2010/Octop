@@ -1,8 +1,11 @@
 ## Context
 
 - 宿主：Octop（Python 3.12 + FastAPI + React/Vite + uv），模块边界与迁移规范见根目录 `AGENTS.md`；DB 当前 schema v20，迁移必须成对（`.sql` + `.pg.sql`）。
-- 输入：飞书需求 V1.0 与架构方案（整合版 v1.0，权威）；本地参照 `docs/diagnosis-design/`（精简版 v2）与 `skill-verify/shop-diagnosis-kickoff-prompt.md`。
-- 数据事实参考：`data_agent_total_zhilong/backend/app/plugins/rag_retrieval/resources/semantic_layer/` 的店铺绩效指标/表/时间口径，以及 `backend/app/skills_analysis/store_performance_analysis/` 的固定 Q1~Q5、下钻、预加载与分析逻辑。该参考只提供口径，不改变飞书需求边界。
+- 验收权威（绑定）：飞书需求文档是验收 SoT，`https://ucnbkepnx9u9.feishu.cn/docx/GTPJdXujnom2WnxgUFVcU2Bonsb`。2026-10-16 用户确认的环比截图（7 天周期环比公式、等长窗口用周期合计、比率用分子分母合计、仅在两侧天数不等时对累计指标做日均、轻微/一般/严重下滑分档、负向指标上升为恶化、正向指标下降为恶化）同为绑定约束。黄标以飞书看板单元格为准，完整集合为：库存、推广 roas、流量异常（建议调价未调价）、流量异常SPU数占比、推广 Roas；五项均 `fetchable=false`。早先口头子集不替代这份看板清单。需求文档正文与截图分档百分数若不一致，先按需求文档修订本规格再实现。
+- 架构 wiki（飞书架构方案 / 整合版）只作为框架技术参考，内容可能不完整。与 wiki 不一致不阻塞验收，也不得用 wiki 覆盖需求文档、环比截图或黄标清单。
+- 本地参照：`docs/diagnosis-design/`（精简版 v2）与 `skill-verify/shop-diagnosis-kickoff-prompt.md` 为非绑定参考。
+- 数据事实参考：`data_agent_total_zhilong/backend/app/plugins/rag_retrieval/resources/semantic_layer/` 的店铺绩效指标/表/时间口径，以及 `backend/app/skills_analysis/store_performance_analysis/` 的固定 Q1~Q5、下钻、预加载与分析逻辑。该参考只给非黄标指标提供口径和 SQL 模板，不改变飞书需求边界，不移植 RAG 运行时。本仓库 HEAD 未包含该 data_agent 树。
+- 实现对照：HEAD `0576cad3` 无 `infra/diagnosis/`、症状规则引擎或环比单测，没有与本补丁冲突的既有实现需要改写。环比与黄标规则先冻结在规格中，实现阶段按 tasks 3.8 用单测锁定。
 - 既有能力：诊断数据服务（:8787，MCP 5 工具）已存在不动；Agent 运行时为 octop-harness；编排需进程内直调 Agent（Route-D）。
 
 ## Goals / Non-Goals
@@ -33,6 +36,10 @@
 8. **thread 命名与并发**：归因会话命名 `diag:{run_id}:{store_id}:a{attempt}`；全局 Semaphore（默认 3~5，配置化）限制并发，纯数据节点不占槽。
 9. **报告确定性合成**：summarize 只拼装快照数字与已校验结论；失败降级为列表拼接并在附录标注。
 10. **前端走既有分层**：`dashboard/src/api/` 封装 + 页面组件 + i18n 双语键；构建产物由 `make build-frontend` 生成。
+11. **验收权威分开写**：需求文档负责验收；环比截图与飞书看板黄标五项是 2026-10-16 起写入本 change 的绑定规则；架构 wiki 只解释框架，不单独规定取数或环比。冲突时改规格，不在实现里分叉两套口径。
+12. **环比公式与窗口**：环比 = `(本期值 - 上期值) / 上期值 × 100%`。等长 7 天窗口用周期合计。累计指标（如曝光）直接比 7 天累计值。比率指标（退货率、回复率、连带率等）用窗口内 `sum(分子) / sum(分母)`，再代入环比公式；日比率的算术平均不进入计算，两侧天数不等时也不改用日比率均值。累计指标只有在两侧天数不等（如 7 天对 6 天）时，才先除以各自天数得到日均，再代入环比公式。上期值为 0 或缺失、或比率分母合计为 0 时，环比不可计算，不写数值。
+13. **恶化分档（截图方案 A）**：按指标方向把变化换成恶化幅度 w（正向指标 w = −环比，负向指标 w = 环比；恶化为正）。负向指标（退货率、投诉率）上升为恶化；正向指标（曝光、连带率、回复率）下降为恶化。分档唯一：`5% ≤ w < 10%` 轻微下滑，`10% ≤ w ≤ 20%` 一般下滑，`w > 20%` 严重下滑，`w < 5%` 不入档。截图在 −10% 处两档相接，严重档写明「下滑超 20%」，因此 −10% 归入一般（该档起点），−20% 仍属一般，严格大于 20% 才为严重。用词采用截图的「轻微 / 一般 / 严重」；「中度」即一般，「重度」即严重，不另设第四档。好转方向的变化不标下滑。
+14. **可取数标记**：指标目录按飞书看板黄格原文写入 `fetchable=false`，症状管线与归因都 SKIP，不参与越阈、环比、健康判定和下钻，不写猜测值、代理值、样例值或模型补数。完整集合是：库存；推广 roas；流量异常（建议调价未调价）；流量异常SPU数占比；推广 Roas。其中「推广 roas」与「推广 Roas」都保留，不互相替代，也不改写成看板上没有的「推广ROAS」。单独的「流量异常」不是黄格原文，不代替「流量异常（建议调价未调价）」或「流量异常SPU数占比」。其余诊断范围内指标必须能按 data_agent 语义层与受控 SQL 模板取数（白名单、参数绑定、分区裁剪）。查询失败记为数据不足或节点失败，不把该指标改标成 `fetchable=false`。实现不得自行扩大或缩小这份黄标集合。
 
 ## Risks / Trade-offs
 
@@ -40,18 +47,22 @@
 - [attempt 多行化迁移回归风险] → 第二批独立迁移 + db 回归测试 + 版本断言逐批递增。
 - [LLM 编造数字] → schema 校验 + data_refs 核对 + FAIL 重试；禁止静默降级。
 - [订单表 shop_id 与绩效表 store_id 口径不一致] → 下钻 SQL 测试同时覆盖两套键名。
-- [demo 语义层与飞书需求漂移] → 以飞书 wiki 和 OpenSpec specs 为需求权威；data_agent 只作为表、指标、SQL 和处理逻辑事实参考。
+- [demo 语义层、架构 wiki 与飞书需求漂移] → 验收以飞书需求文档为准；环比算法与下滑分档以 2026-10-16 截图为绑定规则，黄标以飞书看板五项为准，并写入 specs。架构 wiki 不完整时不阻塞。data_agent 只作为非黄标指标的表、指标、SQL 和处理逻辑参考。
+- [比率环比误用日均、或黄标指标被补数] → 规格场景与 tasks 3.8 单测锁定周期合计口径；`fetchable=false` 在进入阈值和归因之前短路。
 - [真实 LLM E2E 成本与时长] → 限 3 店小批次（分钟级），并可用 fake agent 集成测试兜底回归。
 
 ## Migration Plan
 
 1. 按 021 → 022 → 023 顺序落迁移，每批更新 `tests/unit/db/test_db_pool.py` 版本断言并跑 db 回归。
 2. 编排 / API / Agent / UI 按模块分支合入 `feature/store-diagnosis`，合并顺序：DB+Data → Orchestrator → API → Agent → UI → E2E。
-3. 上线先本机直跑部署冒烟（`octop run` + Cron 13:00 链路，不引入 Docker/compose 作为验证前置），再真实数据小批次联调，最后 Playwright + 人工 UAT 签字。
+3. 上线先本机直跑部署冒烟（`octop run` + Cron 13:00 链路，不引入 Docker/compose 作为验证前置），再真实数据小批次联调。人工验收签字等待需求文档写出 UAT / 验收条文之后再进行；当前不自拟签字清单。
 4. 回滚：迁移成对且幂等，失败回退上一版本断言；Cron 挂点可配置关闭，不影响既有主路径。
 
 ## Open Questions
 
 - :8787 数据服务的生产部署归属（运维边界）待拍板；connector 抽象先隔离影响。
 - UAT 样例店铺集与健康 / 异常组合由谁提供待确认。
+- 飞书需求文档当前状态为「待评审」。正文没有 UAT、验收、Done、U1–U10 条文。本 change 不补写这些内容，也不把自拟检查项当作验收。待需求文档写入相应条文后，再回写 tasks 中的验收步骤。
 - 真实 LLM E2E 的 provider 限额与预算（3 店 ≤1 分钟级）待确认。
+- 非黄标指标与 data_agent 语义层的逐项 ID / 表 / 字段映射尚未入库。实现时逐项引用语义层与 SQL 模板；映射缺失记为数据缺口，不改为 `fetchable=false`，也不编造值。
+- 需求文档正文里的绝对阈值（如 C-S09 / C-S12 / C-S13）仍以需求文档为准。环比分档百分数目前按 2026-10-16 截图写入规格；若需求文档正文给出不同分档数字，先改规格再实现。
