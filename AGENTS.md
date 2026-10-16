@@ -379,6 +379,8 @@ Boundary rules are in [§5](#5-module-boundaries). Additionally:
 
 ## 10. Change workflow
 
+Harness process rules: `.harness/rules/00-index.md` (does not override this file).
+
 1. **Clarify scope** — read relevant code/docs; confirm assumptions and ambiguities with the user (see [§1](#1-collaboration-principles)).
 2. **Hooks** — if this clone has not run `make install-hooks` yet, do it before committing (see [§6](#6-run-commands)). Pre-commit must stay green (`make all` + dashboard build).
 3. **Minimal implementation** — change only task-related files; dashboard source is in `dashboard/`, build output in `src/octop/dashboard/` (run `make build-frontend` after UI changes).
