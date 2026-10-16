@@ -2,12 +2,13 @@
 
 ## 权威顺序
 
-1. 飞书需求文档 `GTPJdXujnom2WnxgUFVcU2Bonsb`。
-2. 飞书架构 wiki `UGlmwS7rsiqRs2kKpcEcLwuInbU`。
+1. 飞书需求文档 `GTPJdXujnom2WnxgUFVcU2Bonsb`（验收 SoT）：https://ucnbkepnx9u9.feishu.cn/docx/GTPJdXujnom2WnxgUFVcU2Bonsb
+2. 已写入 OpenSpec 的 2026-10-16 绑定补丁：环比截图口径，以及飞书看板黄格（库存、推广 roas、流量异常（建议调价未调价）、流量异常SPU数占比、推广 Roas，均 `fetchable=false`）。
 3. OpenSpec change `add-store-diagnosis`。
-4. data_agent 语义层与店铺绩效 demo 的实测口径。
+4. data_agent 语义层与店铺绩效 demo 的实测口径，只用于非黄标指标的取数模板，不移植 RAG 运行时。
+5. 飞书架构 wiki `UGlmwS7rsiqRs2kKpcEcLwuInbU`：框架技术参考，可能不完整，不阻塞验收。
 
-本文件只提供实现前事实参考。若与 OpenSpec 需求冲突，先更新 OpenSpec，再实现。
+本文件只提供实现前事实参考。若与 OpenSpec 需求冲突，先更新 OpenSpec，再实现。架构 wiki 不覆盖需求文档、环比截图或黄标清单。
 
 ## 固定链路原则
 
@@ -52,7 +53,7 @@
 
 demo 的可靠边界值得保留：定时任务只幂等发起 preload 并立即返回 job；后台任务从 MaxCompute 读取固定数据集，写入版本化快照并记录 row counts 与终态；分析只消费 `COMPLETED` 且行数大于 0 的 data version。`RUNNING` 禁止重复提交补数，`FAILED` 允许人工重试；HTTP 异常输出固定错误，不让 LLM 编造状态。
 
-Octop 落地仍按飞书 wiki：流程 A 由 `DiagnosisOrchestrator` 驱动 ensure data ready、analysis、snapshot 与状态事件；流程 B 只对异常项做两段式归因。demo 的 PG/Redis 进程形态不直接移植。
+Octop 落地以飞书需求文档与 OpenSpec 为准：流程 A 由 `DiagnosisOrchestrator` 驱动 ensure data ready、analysis、snapshot 与状态事件；流程 B 只对异常项做两段式归因。架构 wiki 只解释这套框架，不单独规定环比或取数口径。demo 的 PG/Redis 进程形态不直接移植。
 
 ## SQL 构造参考
 
