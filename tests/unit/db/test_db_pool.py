@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 import pytest
+from tests.support.diagnosis_contract import diagnosis_schema_gaps
 
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
@@ -143,6 +144,17 @@ def test_run_migrations_idempotent(db: SqlitePool):
     assert "skill_packages" in table_names
     assert "knowledge_base_id" in kb_cols
     assert {"document_id", "path", "is_dir"}.issubset(doc_cols)
+
+
+def test_diagnosis_schema_is_not_migrated_yet(db: SqlitePool) -> None:
+    """021 must move the watermark v20 → v21 and create the diagnosis tables.
+
+    Existing ``assert v == 20`` cases stay the shipped watermark. This contract
+    fails until the single unreleased pair exists. It does not expect v22, v23,
+    or migration files 022 / 023.
+    """
+    gaps = diagnosis_schema_gaps(db)
+    assert not gaps, "diagnosis schema is not migrated yet: " + "; ".join(gaps)
 
 
 def test_repair_legacy_schema_ensures_columns(tmp_path: Path) -> None:
