@@ -115,9 +115,19 @@ def ratio_scale_statements() -> tuple[str, ...]:
     return _RATIO_SCALE_STATEMENTS
 
 
-def chosen_ratio_scale() -> None:
-    """No single ratio scale is chosen."""
-    return None
+def chosen_ratio_scale() -> str:
+    """Stored ratio scale. Display and judgment multiply this by 100."""
+    return "0~1"
+
+
+def ratio_display_multiplier() -> int:
+    """Multiplier applied when a stored ratio is displayed or judged."""
+    return 100
+
+
+def score_passthrough_metrics() -> tuple[str, ...]:
+    """Scores that skip the ratio conversion."""
+    return ("用户评价分", "售罄健康分")
 
 
 def threshold_statements() -> tuple[str, ...]:
@@ -125,9 +135,19 @@ def threshold_statements() -> tuple[str, ...]:
     return _THRESHOLD_STATEMENTS
 
 
-def chosen_threshold_set() -> None:
-    """No single C-S threshold column is chosen."""
-    return None
+def chosen_threshold_set() -> tuple[str, ...]:
+    """Source A only. Source B and the old symptom column are notes."""
+    return ("C-S09 ≥10%", "C-S12 <90%", "C-S13 <95%")
+
+
+def threshold_notes() -> tuple[str, ...]:
+    """Reference columns. They are not the acceptance constants."""
+    return (
+        "C-S09 ≥2%（超同行 70%）",
+        "C-S12 <100%",
+        "C-S13 <100%",
+        "C-S09 ≥2%、C-S12 <90%、C-S13 <95%",
+    )
 
 
 def score_field_names() -> tuple[str, ...]:
@@ -135,9 +155,14 @@ def score_field_names() -> tuple[str, ...]:
     return _SCORE_FIELD_NAMES
 
 
-def chosen_score_field() -> None:
-    """Neither score field name is selected as the only one."""
-    return None
+def chosen_score_field() -> str:
+    """Canonical store-performance score field."""
+    return "mall_check_score"
+
+
+def score_field_alias() -> str:
+    """Old shape key for the same score. It is not a second canonical field."""
+    return "perf_score"
 
 
 def score_fields_are_same() -> bool:
@@ -150,6 +175,16 @@ def detail_limit_statements() -> tuple[str, ...]:
     return _DETAIL_LIMIT_STATEMENTS
 
 
-def chosen_detail_limit() -> None:
-    """No single detail-row limit is chosen."""
-    return None
+def chosen_detail_limit() -> str:
+    """Default Top N, with full documents only in Excel or attachments."""
+    return "默认 Top N + 完整进附件"
+
+
+def top10_is_hard_cap() -> bool:
+    """Top 10 is a configurable reference default, not a hard cap."""
+    return False
+
+
+def top10_reference_n() -> int:
+    """Reference default for N. It can be configured."""
+    return 10
