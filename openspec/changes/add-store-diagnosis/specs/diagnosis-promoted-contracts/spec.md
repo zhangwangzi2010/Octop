@@ -18,7 +18,7 @@
 ### Requirement: 十项二级指标名
 已由用户批准从参考升格为契约。
 
-二级指标名 MUST 使用 `.harness/domains/store-diagnosis-baseline.md` 指标白名单的下列 10 个写法，顺序如下。`performance_indicator` 是 kickoff §7.1 写出的「二级指标名（行转列的键）」。这些名字是指标名，本契约不把它们声明为 JSON 键。
+二级指标名 MUST 使用 `.harness/domains/store-diagnosis-baseline.md` 指标白名单的下列 10 个写法，顺序如下。`performance_indicator` 是 kickoff §7.1 写出的「二级指标名（行转列的键）」。这些名字是指标名。快照 JSON 键的写法见「快照 JSON 键」；本条仍只登记名字与 metric id。
 
 1. 用户评价分
 2. 非买家责任退货退款率
@@ -143,3 +143,62 @@ kickoff §7.3 写出不可下钻、因而没有这四类明细的 6 项：缺货
 #### Scenario: 履约口径使用已写出的字段
 - **WHEN** 计算延迟发货率或延迟到货率
 - **THEN** 延迟发货率使用 `ship_time IS NOT NULL` 与 `parent_shipping_time > expect_ship_latest_time`，延迟到货率使用 `parent_receipt_time IS NOT NULL` 与 `parent_receipt_time > latest_delivery_time`
+
+### Requirement: 快照 JSON 形状
+已由用户批准从参考升格为契约。
+
+kickoff §3.4 快照文件的形状 MUST 按原文登记：店铺/主体/负责人 + `store_performance{perf_score, score_level, metrics[10]}`。
+
+嵌套是：店铺、主体、负责人与对象 `store_performance` 同级；`store_performance` 含 `perf_score`、`score_level`、`metrics`；`metrics` 的写法是 `metrics[10]`。这些是该形状写出的字段。
+
+`score_level` 只作为 `store_performance` 里的形状字段。本条不登记 `mall_check_score`，也不把等级取值、比率量纲或 `thresholds.json` 写成单独契约。同一句后半的「比率 0~100」和「命中标注运行时按 thresholds.json 计算」不在本条。
+
+#### Scenario: 形状按原文核对
+- **WHEN** 读取快照 JSON 形状
+- **THEN** 字段是店铺、主体、负责人，以及 `store_performance` 下的 `perf_score`、`score_level`、`metrics[10]`
+
+#### Scenario: score_level 只留在形状内
+- **WHEN** 核对 `score_level`
+- **THEN** 它只出现在 `store_performance` 的形状字段中
+
+### Requirement: 快照 JSON 键
+已由用户批准从参考升格为契约。
+
+`metrics[10]` 的十个条目 MUST 使用 kickoff §7.1 表格中的指标名作为 JSON 键。kickoff 写法与白名单不同时，JSON 键用 kickoff 写法，另一处写法只作对照，不并成同一个键。
+
+| JSON 键（kickoff 表格） | 对照 |
+|---|---|
+| 用户评价分 | 与白名单相同 |
+| 非买家责任退货退款率 | 需求 §6.3 写作「非买家责任退款退货率」 |
+| 延迟发货率 | 与白名单相同 |
+| 延迟到货率 | 与白名单相同 |
+| 缺货率 | 与白名单相同 |
+| 24 小时回复率 | 白名单写作「24小时回复率」 |
+| 售后准时率 | 与白名单相同 |
+| 爆旺款率 | 与白名单相同 |
+| 售罄健康分 | 与白名单相同 |
+| 活动报名率 | 与白名单相同 |
+
+每个指标键下面的 Q4 短名 MUST 保留为 JSON 键：`latest`、`over_peers`、`next_level`。这三个短名来自 harness 的 Q4 输出和本规格「Q4 的 latest、over_peers、next_level」。
+
+对照按原文另列，不互相改写：
+
+- kickoff §3.4 的 data_refs 路径是 `metrics.<指标名|key>.<latest|prev|weight>`。`latest` 与上面的 JSON 键同字。`prev` 与 `weight` 是该路径里的另外两个词。
+- Q4 中文仍是最新值、超过同行、下一级标准。
+- 物理列仍是 `indicator_data_detail`、`indicator_data_over_peers_rate`、`indicator_data_next_level_threshold`。
+
+#### Scenario: 十个指标键用 kickoff 写法
+- **WHEN** 核对 `metrics[10]` 的 JSON 键
+- **THEN** 键是用户评价分、非买家责任退货退款率、延迟发货率、延迟到货率、缺货率、24 小时回复率、售后准时率、爆旺款率、售罄健康分、活动报名率
+
+#### Scenario: 回复率两种写法不并成一个键
+- **WHEN** 对照 JSON 键「24 小时回复率」与白名单「24小时回复率」
+- **THEN** 快照键用「24 小时回复率」，白名单写法留在对照中
+
+#### Scenario: 退款用词不并成一个键
+- **WHEN** 对照 JSON 键「非买家责任退货退款率」与需求 §6.3「非买家责任退款退货率」
+- **THEN** 快照键用「非买家责任退货退款率」，需求用词留在对照中
+
+#### Scenario: Q4 短名是指标键下的 JSON 键
+- **WHEN** 读取一个二级指标键下的字段
+- **THEN** 其中有 `latest`、`over_peers`、`next_level`，并且这三项不改写成 `indicator_data_detail`、`indicator_data_over_peers_rate`、`indicator_data_next_level_threshold`
