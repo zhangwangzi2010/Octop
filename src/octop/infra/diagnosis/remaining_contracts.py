@@ -1,7 +1,8 @@
-"""Recorded remaining contract text. Unresolved gaps stay unchosen.
+"""Recorded remaining contract text.
 
-This module does not pick a ratio scale or a threshold column, and it does
-not list strategy metrics, fulfillment columns, or after-sales class names.
+Ratio scale, threshold column, score field, and detail limit use the
+accepted constants. Reference lines stay in the note functions. Strategy
+metric names, fulfillment columns, and after-sales class names are not listed.
 """
 
 from __future__ import annotations
@@ -36,21 +37,24 @@ _BATCH_REPORT_CONTRACT: tuple[str, ...] = (
 _DATA_REF_WORDS: tuple[str, ...] = ("latest", "prev", "weight")
 _Q4_SHORT_NAMES: tuple[str, ...] = ("latest", "over_peers", "next_level")
 _RATIO_SCALE_STATEMENTS: tuple[str, ...] = (
-    "文件只存原始值（比率 0~100）。",
     "用户评价分 / 售罄健康分为分值、直通；其余 8 项比率指标为比例（0~1），×100 后再判定/展示；over_peers_rate / next_level_threshold 同指标量纲、同指标规则。",
     "除用户评价分、售罄健康分为分值外，8 项比率指标源表为 0~1 比例，展示需 ×100。",
+)
+_RATIO_SCALE_NOTES: tuple[str, ...] = (
+    "文件只存原始值（比率 0~100）。",
     "比率类源值通常为 0~1，展示与判定统一换算为百分比；只有延迟发货率在语义层显式标注 scale 时也要全指标统一应用实测口径。",
 )
 _THRESHOLD_STATEMENTS: tuple[str, ...] = (
-    "延迟发货率 (C-S09) 来源 A ≥ 10%；来源 B ≥ 2%（超同行 70%）",
-    "24h 回复率 (C-S12) 来源 A < 90%；来源 B < 100%",
-    "售后准时率 (C-S13) 来源 A < 95%；来源 B < 100%",
-    "C-S09 ≥2%、C-S12 <90%、C-S13 <95%",
+    "延迟发货率 (C-S09) 来源 A ≥ 10%",
+    "24h 回复率 (C-S12) 来源 A < 90%",
+    "售后准时率 (C-S13) 来源 A < 95%",
 )
 _SCORE_FIELD_NAMES: tuple[str, ...] = ("mall_check_score", "perf_score")
 _DETAIL_LIMIT_STATEMENTS: tuple[str, ...] = (
-    "单据级明细只在 Excel（每店铺每类 Top 10）；报告正文只写结论 + 占比。同节另写 4 区块 × Top 10。",
     "明细默认 Top N，完整单据只进 Excel/附件，不进入 LLM 上下文。",
+)
+_DETAIL_LIMIT_NOTES: tuple[str, ...] = (
+    "单据级明细只在 Excel（每店铺每类 Top 10）；报告正文只写结论 + 占比。同节另写 4 区块 × Top 10。",
 )
 
 
@@ -111,8 +115,13 @@ def is_alias(left: str, right: str) -> bool:
 
 
 def ratio_scale_statements() -> tuple[str, ...]:
-    """Both scale sentences. Neither is selected."""
+    """Accepted ratio-scale sentences. The 0~100 line is a note."""
     return _RATIO_SCALE_STATEMENTS
+
+
+def ratio_scale_notes() -> tuple[str, ...]:
+    """Reference scale lines. They are not acceptance constants."""
+    return _RATIO_SCALE_NOTES
 
 
 def chosen_ratio_scale() -> str:
@@ -131,7 +140,7 @@ def score_passthrough_metrics() -> tuple[str, ...]:
 
 
 def threshold_statements() -> tuple[str, ...]:
-    """Both threshold columns and the symptom-spec sentence."""
+    """Source A threshold sentences."""
     return _THRESHOLD_STATEMENTS
 
 
@@ -171,8 +180,13 @@ def score_fields_are_same() -> bool:
 
 
 def detail_limit_statements() -> tuple[str, ...]:
-    """Both detail-limit sentences. Neither count is selected."""
+    """Accepted detail-limit sentence."""
     return _DETAIL_LIMIT_STATEMENTS
+
+
+def detail_limit_notes() -> tuple[str, ...]:
+    """Kickoff Top 10 wording. It is not a hard cap."""
+    return _DETAIL_LIMIT_NOTES
 
 
 def chosen_detail_limit() -> str:

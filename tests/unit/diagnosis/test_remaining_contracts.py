@@ -27,6 +27,11 @@ Expected surface once the module exists:
 - ``chosen_detail_limit() -> str``
 - ``top10_is_hard_cap() -> bool``
 - ``top10_reference_n() -> int``
+- ``ratio_scale_statements()`` keeps the accepted 0~1 sentences
+- ``ratio_scale_notes()`` keeps §3.4「比率 0~100」 and the semantic-layer sentence
+- ``threshold_statements()`` keeps source A only
+- ``detail_limit_statements()`` keeps the default Top N sentence
+- ``detail_limit_notes()`` keeps the kickoff Top 10 sentence
 """
 
 from __future__ import annotations
@@ -84,6 +89,30 @@ CANONICAL_SCORE_FIELD = "mall_check_score"
 SCORE_FIELD_ALIAS = "perf_score"
 CHOSEN_DETAIL_LIMIT = "默认 Top N + 完整进附件"
 TOP10_REFERENCE_N = 10
+RATIO_SCALE_STATEMENTS = (
+    "用户评价分 / 售罄健康分为分值、直通；其余 8 项比率指标为比例（0~1），×100 后再判定/展示；over_peers_rate / next_level_threshold 同指标量纲、同指标规则。",
+    "除用户评价分、售罄健康分为分值外，8 项比率指标源表为 0~1 比例，展示需 ×100。",
+)
+RATIO_SCALE_NOTES = (
+    "文件只存原始值（比率 0~100）。",
+    "比率类源值通常为 0~1，展示与判定统一换算为百分比；只有延迟发货率在语义层显式标注 scale 时也要全指标统一应用实测口径。",
+)
+THRESHOLD_SOURCE_A = (
+    "延迟发货率 (C-S09) 来源 A ≥ 10%",
+    "24h 回复率 (C-S12) 来源 A < 90%",
+    "售后准时率 (C-S13) 来源 A < 95%",
+)
+DETAIL_LIMIT_STATEMENTS = ("明细默认 Top N，完整单据只进 Excel/附件，不进入 LLM 上下文。",)
+DETAIL_LIMIT_NOTES = (
+    "单据级明细只在 Excel（每店铺每类 Top 10）；报告正文只写结论 + 占比。同节另写 4 区块 × Top 10。",
+)
+_UNSELECTED_DOCSTRINGS = (
+    "Neither is selected",
+    "Neither count is selected",
+    "Both threshold columns",
+    "Unresolved gaps stay unchosen",
+    "does not pick a ratio scale",
+)
 
 
 def test_hit_annotation_uses_thresholds_json() -> None:
@@ -174,6 +203,54 @@ def test_detail_limit_is_default_top_n_plus_attachments() -> None:
     assert _fn("chosen_detail_limit")() == CHOSEN_DETAIL_LIMIT
     assert _fn("top10_is_hard_cap")() is False
     assert _fn("top10_reference_n")() == TOP10_REFERENCE_N
+
+
+def test_statement_functions_keep_only_the_accepted_wording() -> None:
+    """语句函数不再把落选口径和验收常量并列。落选句只留在注记。"""
+    ratio = _texts("ratio_scale_statements")
+    thresholds = _texts("threshold_statements")
+    details = _texts("detail_limit_statements")
+    ratio_blob = "\n".join(ratio)
+    threshold_blob = "\n".join(thresholds)
+    detail_blob = "\n".join(details)
+    assert "比率 0~100" not in ratio_blob
+    assert "语义层" not in ratio_blob
+    assert "来源 B" not in threshold_blob
+    assert "C-S09 ≥2%" not in threshold_blob
+    assert "< 100%" not in threshold_blob
+    assert "C-S09 ≥2%、C-S12 <90%、C-S13 <95%" not in threshold_blob
+    assert "Top 10" not in detail_blob
+    assert ratio == RATIO_SCALE_STATEMENTS
+    assert thresholds == THRESHOLD_SOURCE_A
+    assert details == DETAIL_LIMIT_STATEMENTS
+    ratio_notes = _texts("ratio_scale_notes")
+    detail_notes = _texts("detail_limit_notes")
+    assert ratio_notes == RATIO_SCALE_NOTES
+    assert detail_notes == DETAIL_LIMIT_NOTES
+    assert "比率 0~100" in "\n".join(ratio_notes)
+    assert "语义层" in "\n".join(ratio_notes)
+    assert "Top 10" in "\n".join(detail_notes)
+    assert _fn("chosen_ratio_scale")() == CHOSEN_RATIO_SCALE
+    assert "语义层" not in _fn("chosen_ratio_scale")()
+    assert _texts("threshold_notes") == THRESHOLD_NOTES
+    assert _fn("score_fields_are_same")() is False
+    assert _fn("is_alias")("prev", "over_peers") is False
+    assert _fn("is_alias")("weight", "next_level") is False
+
+
+def test_statement_docstrings_do_not_call_the_choice_unselected() -> None:
+    """说明不再写比率、阈值列或明细条数尚未选取。"""
+    module = _module()
+    docs = [module.__doc__ or ""]
+    for name in (
+        "ratio_scale_statements",
+        "threshold_statements",
+        "detail_limit_statements",
+    ):
+        docs.append(_fn(name).__doc__ or "")
+    combined = "\n".join(docs)
+    for phrase in _UNSELECTED_DOCSTRINGS:
+        assert phrase not in combined
 
 
 def _texts(name: str) -> tuple[str, ...]:
