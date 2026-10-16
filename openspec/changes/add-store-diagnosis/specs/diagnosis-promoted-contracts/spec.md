@@ -328,3 +328,43 @@ kickoff §3.4 的三份形状按原文登记：
 #### Scenario: 两套词不合并
 - **WHEN** 对照 `prev` 与 `over_peers`，以及 `weight` 与 `next_level`
 - **THEN** 契约写明它们不是别名，并且没有把两边收成同一个键
+
+### Requirement: 一级取数到语义层的底表映射
+已由用户批准从参考升格为契约。下面六条是唯一验收常量。
+
+1. 整体下滑（GMV / 销量 / 订单）读取订单明细的 `sales_amount` / `sales_quantity` / `order_count`。
+2. 品类、售龄、策略、Top 切片读取 SPU 概览的 `spu_sold_amount` / `spu_sold_quantity` / `spu_order_count`，以及该切片对应的切片度量。
+3. 动销 SPU 是 `active_spu_count`。在售是 `on_sale_spu_count`。品类维度是 `spu_category`。
+4. 售龄是 `ads_bi_temu_spu_overview_self_df.min_first_join_time` 与当前时间的差。四档是 0–10 / 11–29 / 30–89 / ≥90 天。第 30 天属于 30–90 档。
+5. 售龄的动销率是 `ecommerce.metric.active_spu_rate`，并按售龄档过滤。
+6. 五条黄标不查询、不替代。症状判定和归因把它们标为「指标及相关明细空缺」。这五条仍是库存、推广 roas、流量异常（建议调价未调价）、流量异常SPU数占比、推广 Roas。
+
+环比、贡献、权重一类展示值是派生在诊断侧、语义层无同名 metric。本需求不冻结环比、贡献或权重的计算公式。策略切片没有写出独立指标名，不编造商品策略指标名。
+
+#### Scenario: 整体下滑读取订单明细
+- **WHEN** 取整体下滑的 GMV、销量或订单
+- **THEN** 读取的字段是 `sales_amount`、`sales_quantity`、`order_count`
+
+#### Scenario: 切片读取 SPU 概览
+- **WHEN** 取品类、售龄、策略或 Top 切片
+- **THEN** 读取 `spu_sold_amount`、`spu_sold_quantity`、`spu_order_count`
+
+#### Scenario: 动销、在售和品类维度
+- **WHEN** 核对动销 SPU、在售和品类维度
+- **THEN** 它们分别是 `active_spu_count`、`on_sale_spu_count`、`spu_category`
+
+#### Scenario: 售龄按加入时间分四档
+- **WHEN** 计算售龄
+- **THEN** 用 `ads_bi_temu_spu_overview_self_df.min_first_join_time` 与当前时间的差，四档是 0–10、11–29、30–89、≥90 天，并且第 30 天属于 30–90 档
+
+#### Scenario: 售龄动销率按档过滤
+- **WHEN** 取售龄下的动销率
+- **THEN** 度量是 `ecommerce.metric.active_spu_rate`，并按售龄档过滤
+
+#### Scenario: 黄标不查询也不替代
+- **WHEN** 症状判定或归因遇到五条黄标之一
+- **THEN** 不查询、不替代，并标为「指标及相关明细空缺」
+
+#### Scenario: 环比贡献权重不冻结公式
+- **WHEN** 展示值是环比、贡献或权重
+- **THEN** 该值标为派生在诊断侧、语义层无同名 metric，并且契约没有环比、贡献或权重的计算公式
