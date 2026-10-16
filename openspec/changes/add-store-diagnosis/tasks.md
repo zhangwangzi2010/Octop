@@ -1,11 +1,11 @@
 ## 1. 基线与规格冻结
 
 - [ ] 1.1 以飞书需求文档 `GTPJdXujnom2WnxgUFVcU2Bonsb` 为验收 SoT，核对环比截图（2026-10-16）与飞书看板黄标五项（库存、推广 roas、流量异常（建议调价未调价）、流量异常SPU数占比、推广 Roas）已写入 design 与 specs。架构 wiki 只作框架参考，与 wiki 的差异不阻塞验收；与需求文档、环比截图或黄标清单冲突时先改 OpenSpec 再实现
-- [ ] 1.2 冻结数据契约：Q1~Q5 口径、快照 schema v2、metrics_catalog 阈值拍板值（C-S09 2% / C-S12 90% / C-S13 95%）。非黄标指标从 data_agent 语义层核对指标 ID、表字段、分区、时间窗和量纲，并记录对应 SQL 模板；上述黄标五项只登记 `fetchable=false`，不编造映射值
+- [ ] 1.2 冻结数据契约：Q1~Q5 口径、快照 schema v2。C-S09 / C-S12 / C-S13 的验收常量已是来源 A（≥10% / <90% / <95%），见 `specs/diagnosis-promoted-contracts/spec.md`。非黄标指标从 data_agent 语义层核对指标 ID、表字段、分区、时间窗和量纲，并记录对应 SQL 模板；上述黄标五项只登记 `fetchable=false`，不编造映射值
 - [ ] 1.3 固化固定 SQL 构造原则：白名单 + 参数绑定 + 分区裁剪 + 禁止 LLM 生成/改写 SQL；RAG 运行时不进入 Octop 诊断链路。取数失败显式失败或标记数据不足，不用模型补数
 - [ ] 1.4 建立 `feature/store-diagnosis` 主干与 WT-1~WT-6 worktree 分支映射（合并顺序：DB → Orchestrator → API → Agent → UI → E2E）
 - [ ] 1.5 注（未完成，不要勾选）：取数展示名已写入 `specs/diagnosis-fetch-fields/spec.md`。第一级 27 个展示名、第二级检查单 25 个叶子、需求 6.3 四类下钻用词以该规格为准。商品策略结构仍是「维度已冻、指标名待补」。该规格不把展示名冻结成 JSON 键、文件路径或比率量纲。本项不代表取数实现完成
-- [ ] 1.6 注（未完成，不要勾选）：参考表里已批准的部分写入 `specs/diagnosis-promoted-contracts/spec.md`，文内短语为「已由用户批准从参考升格为契约」。升格范围是一店一文件约定、十项二级指标名、Q4 的 latest / over_peers / next_level，以及评价 / 售后 / 发货 / 到货四类明细。路径是 kickoff §3.4 的 `{data_dir}/{shop_id}.json`。同节快照形状，以及十个指标名和 Q4 短名的快照 JSON 键，已写入该规格。比率两套量纲、C-S09 / C-S12 / C-S13 两列阈值、mall_check_score 与 perf_score、明细 Top 10 与 Top N 已登记为待裁决缺口。版本路径已登记为无版本段。商品策略指标名、139 个列名、六个售后类名仍阻断。本项不代表实现，也不勾选 1.2
+- [ ] 1.6 注（未完成，不要勾选）：参考表里已批准的部分写入 `specs/diagnosis-promoted-contracts/spec.md`，文内短语为「已由用户批准从参考升格为契约」。升格范围是一店一文件约定、十项二级指标名、Q4 的 latest / over_peers / next_level，以及评价 / 售后 / 发货 / 到货四类明细。路径是 kickoff §3.4 的 `{data_dir}/{shop_id}.json`。同节快照形状，以及十个指标名和 Q4 短名的快照 JSON 键，已写入该规格。四项原待裁决已有唯一验收常量：内部 0~1 对外 ×100；C-S09 / C-S12 / C-S13 用来源 A；`mall_check_score` 为规范名；明细为默认 Top N + 完整进附件。版本路径已登记为无版本段。商品策略指标名、139 个列名、六个售后类名仍阻断。本项不代表实现，也不勾选 1.2
 
 ## 2. DB + 数据层（WT-1）
 
