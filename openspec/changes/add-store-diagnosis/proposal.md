@@ -23,7 +23,8 @@
 - `diagnosis-attribution`: 流程 B 归因下钻（分流、两段式 diagnose、契约门禁、报告五段合成）
 - `diagnosis-api`: 店铺诊断 HTTP 面（/api/diagnosis/runs 提交/查询/取消、幂等与权限）
 - `diagnosis-dashboard`: 诊断中心界面（发起、Run 列表、详情、报告、追问）
-- `diagnosis-fetch-fields`: 两级取数展示名与需求 6.3 四类下钻名称。不含 JSON 键、文件路径、比率量纲、SQL 列
+- `diagnosis-fetch-fields`: 两级取数展示名与需求 6.3 四类下钻名称。展示名本身不含 JSON 键、文件路径、比率量纲
+- `diagnosis-promoted-contracts`: 已由用户批准从参考升格为契约的一店一文件约定、十项二级指标名、Q4 的 latest / over_peers / next_level，以及评价 / 售后 / 发货 / 到货四类明细。路径是 kickoff §3.4 的 `{data_dir}/{shop_id}.json`。同节快照形状是店铺/主体/负责人 + `store_performance{perf_score, score_level, metrics[10]}`，十个指标名与 Q4 短名 `latest` / `over_peers` / `next_level` 是快照 JSON 键。比率验收是内部 0~1、对外 ×100。C-S09 / C-S12 / C-S13 的验收常量是来源 A：≥10% / <90% / <95%。店铺绩效分规范名是 `mall_check_score`，`perf_score` 是别名。明细验收是默认 Top N + 完整进附件。版本路径登记为无版本段。一级取数到底表的六条验收常量已写入该规格。症状规则引擎只组合这些已锁定常量做确定性判定，AI 只写摘要。kickoff §7.1 的二级指标命中线与权重已升格，C-S09 仍是 ≥10%。环比、下滑贡献占比、下滑权重指数标为诊断侧派生量。已拍板：额外指标名为空；策略切片只用 SPU 概览三列。已拍板：履约 139 列为空 / 无此宽表。已拍板：六个售后类名依次是 1-物流履约、2-产品满意度、3-商品价格、4-店铺原因、5-平台原因、6-其他原因；9-未分类只作 SQL ELSE 回退，不进入元组。
 
 ### Modified Capabilities
 
