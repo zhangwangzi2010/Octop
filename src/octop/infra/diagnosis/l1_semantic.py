@@ -50,7 +50,7 @@ def slice_overview_fields() -> tuple[str, ...]:
 
 
 def strategy_metric_names() -> tuple[str, ...]:
-    """Empty. The source does not name strategy metrics."""
+    """Decided empty. Strategy slices use the three SPU overview columns."""
     return ()
 
 

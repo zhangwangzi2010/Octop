@@ -155,12 +155,12 @@ def hit_line_percent(metric: str) -> float | None:
 
 
 def strategy_metric_names() -> tuple[str, ...]:
-    """Empty. Strategy metric names are not invented."""
+    """Decided empty. Extra strategy metric names are not a pending gap."""
     return ()
 
 
 def fulfillment_column_names() -> tuple[str, ...]:
-    """Empty. The 139 fulfillment columns are not invented."""
+    """Decided empty. There is no fulfillment wide table."""
     return ()
 
 

@@ -160,7 +160,7 @@ def test_store_and_subject_use_their_own_scores() -> None:
 
 
 def test_uncovered_rules_have_no_placeholder_percents() -> None:
-    """未覆盖规则不输出占位百分数，也不编造三份阻断清单。"""
+    """未覆盖规则不输出占位百分数，也不编造六个售后类名。"""
     hit_line = _fn("hit_line_percent")
     assert hit_line("延迟发货率") == 10
     assert hit_line("24 小时回复率") == 90
