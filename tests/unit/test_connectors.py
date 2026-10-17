@@ -958,18 +958,27 @@ def test_every_catalog_entry_has_category():
         assert entry.category == category
 
 
-def test_store_perf_catalog_labels_auth_doc_icon_as_undecided():
-    """store-perf 的认证、文档和图标必须标成占位，且阶段不是已可用。"""
+def test_store_perf_catalog_uses_api_key_doc_and_icon():
+    """store-perf 的认证、文档和图标使用已定值，阶段保持 coming_soon。"""
     entry = get_catalog_entry("store-perf")
     assert entry is not None
+    assert entry.auth_kind == "api_key"
+    assert entry.doc_url == "https://ucnbkepnx9u9.feishu.cn/wiki/UGlmwS7rsiqRs2kKpcEcLwuInbU"
+    assert entry.icon == "store-perf"
     assert entry.phase == "coming_soon"
+    assert entry.allowed_tools == (
+        "get_data_latest",
+        "submit_preload",
+        "run_analysis",
+        "drill_metric",
+        "get_report",
+    )
     visible = " ".join(
         part for part in (entry.description, entry.auth_hint) if isinstance(part, str)
     )
-    assert "占位，待拍板" in visible
-    assert "auth_kind" in visible
-    assert "doc_url" in visible
-    assert "icon" in visible
+    assert "占位" not in visible
+    assert "待拍板" not in visible
+    assert "tencent-docs" not in visible
 
 
 def test_oauth_ready_notion():

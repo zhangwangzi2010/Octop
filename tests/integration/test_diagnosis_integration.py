@@ -93,11 +93,16 @@ def test_fake_agent_flow_b_keeps_flow_a_free_of_llm() -> None:
     assert flow_a["llm_calls"] == 0
     entry = get_catalog_entry("store-perf")
     assert entry is not None
-    placeholder = get_catalog_entry("tencent-docs")
-    assert placeholder is not None
-    assert entry.auth_kind == placeholder.auth_kind
-    assert entry.doc_url == placeholder.doc_url
-    assert entry.icon == placeholder.icon
+    assert entry.auth_kind == "api_key"
+    assert entry.doc_url == "https://ucnbkepnx9u9.feishu.cn/wiki/UGlmwS7rsiqRs2kKpcEcLwuInbU"
+    assert entry.icon == "store-perf"
+    assert entry.phase == "coming_soon"
+    visible = " ".join(
+        part for part in (entry.description, entry.auth_hint) if isinstance(part, str)
+    )
+    assert "占位" not in visible
+    assert "待拍板" not in visible
+    assert "tencent-docs" not in visible
     assert entry.allowed_tools == (
         "get_data_latest",
         "submit_preload",
