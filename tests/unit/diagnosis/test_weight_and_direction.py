@@ -60,7 +60,7 @@ def test_multi_hit_fixture_sorts_top5_and_grades_direction_hits(tmp_path: Any) -
     """多命中店按个体权重、总权重、绩效分排序，并命中 C-S11 / C-S14。"""
     module = importlib.import_module("octop.infra.diagnosis.fixture_run")
     data_dir = tmp_path / "snaps"
-    _write(data_dir, "m", 4.0, _overrides_m(), omit=frozenset({"延迟发货率"}))
+    _write(data_dir, "m", 4.0, _overrides_m())
     _write(data_dir, "a", 4.0, _overrides_a())
     _write(data_dir, "b", 3.8, _overrides_b())
     _write(data_dir, "c", 4.2, _overrides_c())
@@ -128,7 +128,6 @@ def _write(
     shop_id: str,
     mall_check_score: float,
     overrides: dict[str, tuple[float, float | None]],
-    omit: frozenset[str] = frozenset(),
 ) -> None:
     latest = {
         "用户评价分": 4.5,
@@ -157,7 +156,6 @@ def _write(
         rows=tuple(
             {"performance_indicator": name, "indicator_data_detail": value}
             for name, value in latest.items()
-            if name not in omit
         ),
     )
     metrics = document["store_performance"]["metrics"]
