@@ -30,7 +30,7 @@
 2. **代码 DAG + 五阶段状态机**：调度与可靠性由编排层兜底（节点超时重试、条件更新认领、boot 恢复、Semaphore 并发），不依赖模型自觉；归因空间用 ≤5 项白名单收敛，ReAct 足够。
 3. **迁移三批低冲突落地（021~023）**：第一批零冲突（node_events 表 + runs 加列 + client_request_id 幂等查重 + boot 恢复 + owner 过滤）；第二批独立迁移回归（attempt 多行化 + 批次头表 + 五阶段状态列 + 取消）；第三批承载流程 A / B 完整链路。资源表遵循 `id` 整数 PK + 公共字符串 ID 唯一、子表存字符串 ID 的项目规范。
 4. **两段式 diagnose + 契约门禁**：段1 确定性上下文与 LLM 解读分离；结论 JSON schema 校验 + data_refs 逐条核对，失败判 FAIL 并 attempt+1 换会话，不静默降级。
-5. **MCP connector + Skill 资产**：store-perf 5 工具经 connector 注册；归因思路沉淀在 4 份 Skill 资产（metrics_catalog 为唯一事实源，阈值冲突按影响文档拍板）。
+5. **MCP connector + Skill 资产**：store-perf 5 工具经 connector 注册；归因思路沉淀在 4 份 Skill 资产（metrics_catalog 为唯一事实源，阈值冲突按影响文档拍板）。诊断专家的五步是 kickoff §6.1.1 已批准的 SOUL 内联工作流，写进 `SOUL.md`，不是 Skill，也不靠 SkillsMiddleware 装载。四份 Skill 资产仍按名字加载：metrics_catalog、analysis_guide、drilldown_playbook、query_tasks。流程 A 保持零 LLM。五步标题是：① read_file 读取本 run 的切片（slice.json）；② 只解读 hit=true 的项（个体优先 / 权重降序；共性带过，不展开）；③ 按契约 write_file interpretation.json（headline / overall / findings / actions / risks，含 data_refs）；④ execute 强制校验（scripts/validate_*.py：结构 + data_refs 数值逐条核对；不过 → 必须改，禁止静默降级）；⑤ 一行收尾（结论 + 命中最重项）。
 6. **固定数据链路**：SQL 由受控模板、指标白名单、字段白名单、参数绑定和分区裁剪构造；LLM 不生成或改写 SQL。语义层 YAML 仅作为指标、表、维度和时间语义的口径资产，不引入其 RAG 检索运行时。
 7. **版本化预加载**：定时触发只幂等发起 preload 并立即返回 job；后台任务读取 MaxCompute 固定数据集，写入版本化快照并记录 row counts 与终态。分析只消费 `COMPLETED` 且行数大于 0 的版本；`RUNNING` 禁止重复补数，`FAILED` 允许人工重试。
 8. **thread 命名与并发**：归因会话命名 `diag:{run_id}:{store_id}:a{attempt}`；全局 Semaphore（默认 3~5，配置化）限制并发，纯数据节点不占槽。

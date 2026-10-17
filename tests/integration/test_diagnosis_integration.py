@@ -91,7 +91,23 @@ def test_fake_agent_flow_b_keeps_flow_a_free_of_llm() -> None:
         snapshot_text="快照原文",
     )
     assert flow_a["llm_calls"] == 0
-    assert get_catalog_entry("store-perf") is None
+    entry = get_catalog_entry("store-perf")
+    assert entry is not None
+    placeholder = get_catalog_entry("tencent-docs")
+    assert placeholder is not None
+    assert entry.auth_kind == placeholder.auth_kind
+    assert entry.doc_url == placeholder.doc_url
+    assert entry.icon == placeholder.icon
+    assert entry.allowed_tools == (
+        "get_data_latest",
+        "submit_preload",
+        "run_analysis",
+        "drill_metric",
+        "get_report",
+    )
+    assert "POST /drill" in entry.description
+    assert "POST /analysis/run" in entry.description
+    assert "GET /detail-excel" in entry.description
 
 
 def _module() -> Any:

@@ -36,7 +36,12 @@
 ## 5. Agent 与流程 B（WT-4）
 
 - [ ] 5.1 [RED] 契约门禁测试：结论 schema 校验失败与 data_refs 数字不一致 → item FAIL
-- [ ] 5.2 诊断专家 Agent（SOUL 五步工作流）+ 4 份 Skill 资产（metrics_catalog / analysis_guide / drilldown_playbook / query_tasks）加载
+- [ ] 5.2 诊断专家 Agent（SOUL 五步工作流）+ 4 份 Skill 资产（metrics_catalog / analysis_guide / drilldown_playbook / query_tasks）加载。五步是 kickoff §6.1.1 已批准的 SOUL 内联工作流，不是 Skill。四份 Skill 资产仍按名字加载。流程 A 保持零 LLM。标题依次是：
+  - ① read_file 读取本 run 的切片（slice.json）
+  - ② 只解读 hit=true 的项（个体优先 / 权重降序；共性带过，不展开）
+  - ③ 按契约 write_file interpretation.json（headline / overall / findings / actions / risks，含 data_refs）
+  - ④ execute 强制校验（scripts/validate_*.py：结构 + data_refs 数值逐条核对；不过 → 必须改，禁止静默降级）
+  - ⑤ 一行收尾（结论 + 命中最重项）
 - [ ] 5.3 store-perf MCP connector：5 工具注册与配置；入参透传 run_id / store_id
 - [ ] 5.4 两段式 diagnose + attempt+1 换会话 + thread 命名 `diag:{run_id}:{store_id}:a{attempt}`
 - [ ] 5.5 报告五段合成 summarize + PARTIAL 附录 + 失败降级拼接

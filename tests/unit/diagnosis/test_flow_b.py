@@ -28,6 +28,13 @@ _SECTIONS = (
     "五 逐店明细",
 )
 _SKILLS = ("metrics_catalog", "analysis_guide", "drilldown_playbook", "query_tasks")
+_SOUL_STEPS = (
+    "① read_file 读取本 run 的切片（slice.json）",
+    "② 只解读 hit=true 的项（个体优先 / 权重降序；共性带过，不展开）",
+    "③ 按契约 write_file interpretation.json（headline / overall / findings / actions / risks，含 data_refs）",
+    "④ execute 强制校验（scripts/validate_*.py：结构 + data_refs 数值逐条核对；不过 → 必须改，禁止静默降级）",
+    "⑤ 一行收尾（结论 + 命中最重项）",
+)
 _LINKS = ("越阈指标", "业务后果", "绩效影响", "平台后果")
 
 
@@ -153,14 +160,14 @@ def test_stage1_reuses_ratio_pop_and_skips_yellow_metrics() -> None:
     assert _call("stage2_timeout_seconds") == 600
 
 
-def test_expert_loads_four_skill_assets_and_no_soul_step_names() -> None:
-    """四份技能资产按原文加载。SOUL 五步的步骤名来源里没有。"""
+def test_expert_loads_four_skill_assets_and_soul_steps() -> None:
+    """四份技能资产按原文加载。SOUL 五步是内联标题，不是第六份 Skill。"""
     assert _call("skill_assets") == _SKILLS
     loaded = _items(_call("load_skills"))
     assert tuple(item["name"] for item in loaded) == _SKILLS
     assert [item["name"] for item in loaded if item["fact_source"] is True] == ["metrics_catalog"]
     assert all(item["body"] == "" for item in loaded)
-    assert _call("soul_steps") == ()
+    assert _call("soul_steps") == _SOUL_STEPS
     assert _call("causal_chain_links") == _LINKS
     assert _call("unverified_mark") == "待验证"
 
