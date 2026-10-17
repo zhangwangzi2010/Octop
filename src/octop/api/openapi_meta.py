@@ -172,7 +172,7 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     },
     {
         "name": "diagnosis",
-        "description": "Store-diagnosis runs: create, list, detail, and cancel.",
+        "description": "Store-diagnosis runs: create, list, detail, cancel, and report.",
     },
 ]
 

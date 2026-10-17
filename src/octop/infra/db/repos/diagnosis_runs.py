@@ -192,6 +192,14 @@ class DiagnosisRunsRepo:
             raise RuntimeError("inserted diagnosis item was not readable")
         return found
 
+    def update_item(self, item_id: str, *, status: str, attempt: int) -> None:
+        """Persist the status and attempt already produced for one item."""
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE diag_run_items SET status = ?, attempt = ? WHERE item_id = ?",
+                (status, attempt, item_id),
+            )
+
     def get_item(self, item_id: str) -> DiagnosisRunItemRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
