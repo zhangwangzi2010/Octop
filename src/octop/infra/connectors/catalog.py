@@ -607,16 +607,14 @@ _CATALOG: tuple[ConnectorCatalogEntry, ...] = (
             "drill_metric、get_report。"
             "kickoff §6.3 端点：POST /drill、POST /analysis/run、GET /detail-excel。"
             "不实现 :8787 服务。"
-            "auth_kind、doc_url、icon 占位，待拍板。"
         ),
-        auth_kind="personal_token",
-        doc_url="https://developer.cloud.tencent.com/mcp/server/11803",
-        icon="tencent-docs",
+        auth_kind="api_key",
+        doc_url="https://ucnbkepnx9u9.feishu.cn/wiki/UGlmwS7rsiqRs2kKpcEcLwuInbU",
+        icon="store-perf",
         color="#0052d9",
         phase="coming_soon",
         mcp_mode="remote",
         category="professional",
-        auth_hint="auth_kind、doc_url、icon 占位，待拍板",
         allowed_tools=(
             "get_data_latest",
             "submit_preload",
