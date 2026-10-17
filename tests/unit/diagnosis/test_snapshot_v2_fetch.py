@@ -103,7 +103,7 @@ def test_two_shops_get_two_files(tmp_path: Path) -> None:
 
 
 def test_written_json_keeps_only_the_promoted_keys(tmp_path: Path) -> None:
-    """落盘只留形状字段、规范分和 Q4 短名，窗口与物理列名不入库。"""
+    """落盘只留形状字段、规范分、Q4 短名和可选 prev。窗口与物理列名不入库。"""
     document = _document()
     document["window_start"] = "2026-10-01"
     document["window_end"] = "2026-10-15"
@@ -121,7 +121,9 @@ def test_written_json_keeps_only_the_promoted_keys(tmp_path: Path) -> None:
     assert performance["mall_check_score"] != performance["perf_score"]
     assert set(performance["metrics"]) == set(metric_json_keys())
     late_ship = performance["metrics"]["延迟发货率"]
-    assert set(late_ship) == set(q4_output_names())
+    assert set(late_ship) == {*q4_output_names(), "prev"}
+    assert late_ship["prev"] == 0.2
+    assert "indicator_data_detail" not in late_ship
     assert "window_start" not in loaded
     assert "window_end" not in loaded
     assert "business_date" not in loaded
@@ -216,8 +218,8 @@ def test_yellow_metrics_are_skipped_with_empty_details() -> None:
     assert by_leaf[("平台风控", "流量异常SPU数/占比")]["mark"] == ""
 
 
-def test_level2_reads_only_exact_snapshot_keys() -> None:
-    """叶子与快照键逐字相同才读到 latest；空格和用词不同的名字保持缺口。"""
+def test_level2_reads_locked_keys_and_leaf_aliases() -> None:
+    """锁定键逐字读取。三组别名读锁定键，其余用词不同的叶子仍是缺口。"""
     fetched = _call("two_level_fetch", _document())
     by_leaf = {(item["group"], item["name"]): item for item in _items(fetched, "level2")}
     refund = by_leaf[("店铺绩效", "非买家责任退货退款率")]
@@ -231,12 +233,14 @@ def test_level2_reads_only_exact_snapshot_keys() -> None:
     }
     assert "indicator_data_detail" not in dict(refund["details"])
     reply = by_leaf[("店铺绩效", "24小时回复率")]
-    assert reply["queried"] is False
+    assert reply["name"] == "24小时回复率"
+    assert reply["queried"] is True
     assert reply["value"] is None
-    assert reply["details"] == ()
     ship = by_leaf[("店铺绩效", "48小时发货率")]
-    assert ship["queried"] is False
-    assert ship["value"] is None
+    assert ship["name"] == "48小时发货率"
+    assert ship["value"] == 0.1
+    review = by_leaf[("店铺绩效", "用户评价")]
+    assert review["value"] == 4.25
     prices = [
         by_leaf[("商品检查单", "件单价")],
         by_leaf[("商品运营", "件单价")],

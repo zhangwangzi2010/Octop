@@ -92,6 +92,21 @@ def metric_gate(name: str) -> MetricGate:
     return MetricGate(fetchable=True, skipped=False, value=None)
 
 
+def pop_percent(current: float, previous: float) -> float | None:
+    """(本期-上期)/上期×100%。上期为 0 时不算数。"""
+    return _percent_change(current, previous)
+
+
+def pop_direction(current: float, previous: float) -> str | None:
+    """上升是正号，下降是负号。零和无法计算都没有方向。"""
+    percent = pop_percent(current, previous)
+    if percent is None or percent == 0:
+        return None
+    if percent > 0:
+        return "上升"
+    return "下降"
+
+
 def _percent_change(current: float, previous: float) -> float | None:
     if previous == 0:
         return None

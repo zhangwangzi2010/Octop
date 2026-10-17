@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from octop.infra.diagnosis.derived_metrics import live_minimal
 from octop.infra.diagnosis.fetch_catalog import (
     l1_age_displays,
     l1_display_names,
@@ -21,6 +22,7 @@ from octop.infra.diagnosis.fetch_catalog import (
 from octop.infra.diagnosis.hit_weights import (
     document_denominator,
     document_numerator,
+    locked_metric_name,
     metric_ids,
     metric_name,
 )
@@ -136,6 +138,10 @@ def build_snapshot(
         for physical, short in _physical_pairs():
             if physical in row:
                 metrics[indicator][short] = _passthrough(row[physical])
+        if "prev" in row:
+            stored_prev = _passthrough(row["prev"])
+            if stored_prev is not None:
+                metrics[indicator]["prev"] = stored_prev
     return _document(shop, subject, owner, mall_check_score, perf_score, score_level, metrics)
 
 
@@ -160,12 +166,13 @@ def read_snapshot(data_dir: str, shop_id: str) -> dict[str, Any]:
 def two_level_fetch(
     document: Mapping[str, Any],
     sources: Mapping[str, float] | None = None,
+    windows: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Read level-1 displays and level-2 leaves from a schema v2 document.
 
-    ``sources`` may hold semantic-field numbers. Derived displays do not
-    turn those numbers into a value, and the age sell-through rate is not
-    copied onto a display band.
+    ``sources`` may hold semantic-field numbers. A single source number is
+    not turned into a derived value. ``windows`` supplies current and previous
+    measures for the locked formulas. Displays without a formula stay empty.
     """
     del sources
     normalized = _normalize(document)
@@ -174,7 +181,7 @@ def two_level_fetch(
     if not isinstance(metrics, Mapping):
         metrics = {}
     return {
-        "level1": _level1(),
+        "level1": _level1_with_windows(windows),
         "level2": _level2(metrics),
         "yellow": tuple(_yellow_item(label, "") for label in yellow_labels()),
     }
@@ -246,6 +253,10 @@ def _metrics_from(raw: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
         for short in metric_value_keys():
             if short in incoming:
                 metrics[key][short] = _passthrough(incoming[short])
+        if "prev" in incoming:
+            stored_prev = _passthrough(incoming["prev"])
+            if stored_prev is not None:
+                metrics[key]["prev"] = stored_prev
     return metrics
 
 
@@ -257,6 +268,35 @@ def _physical_pairs() -> tuple[tuple[str, str], ...]:
     """Pair each physical column with the Q4 short name on the same spec row."""
     physical = tuple(name for name, _purpose in q4_physical_fields())
     return tuple(zip(physical, metric_value_keys(), strict=True))
+
+
+def _level1_with_windows(windows: Mapping[str, Any] | None) -> tuple[dict[str, Any], ...]:
+    items = _level1()
+    if windows is None:
+        return items
+    overall = windows.get("overall")
+    slices = windows.get("slices")
+    live = live_minimal(
+        overall=overall if isinstance(overall, Mapping) else None,
+        slices=slices if isinstance(slices, Mapping) else None,
+    )
+    return tuple(_apply_live(item, live) for item in items)
+
+
+def _apply_live(item: Mapping[str, Any], live: Mapping[str, Any]) -> dict[str, Any]:
+    updated = dict(item)
+    name = str(item["name"])
+    displays = live["displays"]
+    if isinstance(displays, Mapping) and displays.get(name) is not None:
+        updated["value"] = displays[name]
+        updated["mark"] = ""
+        return updated
+    gaps = live["gaps"]
+    unnamed = item.get("derived") is True and updated.get("value") is None
+    if (isinstance(gaps, tuple) and name in gaps) or unnamed:
+        updated["value"] = None
+        updated["mark"] = str(live["gap_mark"])
+    return updated
 
 
 def _level1() -> tuple[dict[str, Any], ...]:
@@ -305,8 +345,9 @@ def _level2(metrics: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
         if leaf in yellow:
             items.append(_yellow_item(leaf, checklist))
             continue
-        incoming = metrics.get(leaf)
-        if leaf in keys and isinstance(incoming, Mapping):
+        resolved = locked_metric_name(leaf)
+        incoming = metrics.get(resolved) if isinstance(resolved, str) else None
+        if isinstance(resolved, str) and resolved in keys and isinstance(incoming, Mapping):
             items.append(_metric_item(checklist, leaf, incoming))
             continue
         items.append(_gap_item(checklist, leaf))

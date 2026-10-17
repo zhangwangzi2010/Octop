@@ -6,7 +6,7 @@ names, and slice D formulas are not listed.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 _LATE_SHIP_NUMERATOR = "parent_shipping_time > expect_ship_latest_time"
@@ -122,6 +122,17 @@ def pop_magnitude_percent(metric_id: str) -> None:
     return None
 
 
+def individual_weight(hit_ids: Sequence[str], common_ids: Collection[str]) -> float:
+    """Sum of hit weights that are not common. Several hits stay a sum."""
+    common = set(common_ids)
+    return sum(metric_weight_percent(metric_id) for metric_id in hit_ids if metric_id not in common)
+
+
+def total_weight(hit_ids: Sequence[str]) -> float:
+    """Sum of every hit weight, including common hits."""
+    return sum(metric_weight_percent(metric_id) for metric_id in hit_ids)
+
+
 def document_numerator(metric_id: str) -> str | None:
     """Document-level numerator for C-S09 and C-S10 only."""
     return _NUMERATORS.get(metric_id)
@@ -140,6 +151,24 @@ def reply_rate_judgment_name() -> str:
 def reply_rate_contrast_spelling() -> str:
     """Whitelist spelling. It is not a second judgment name."""
     return "24小时回复率"
+
+
+_LEAF_ALIASES: dict[str, str] = {
+    "用户评价": "用户评价分",
+    "48小时发货率": "延迟发货率",
+    "24小时回复率": "24 小时回复率",
+}
+
+
+def locked_metric_name(name: str) -> str | None:
+    """Read-only leaf alias. JSON keys stay the locked spellings.
+
+    活动覆盖率 is not 活动报名率. 缺货率 stays the locked name.
+    """
+    for metric in _METRICS.values():
+        if metric.name == name:
+            return name
+    return _LEAF_ALIASES.get(name)
 
 
 def common_hit_rate(hit_store_count: int, eligible_store_count: int) -> float:
