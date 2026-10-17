@@ -599,6 +599,30 @@ _CATALOG: tuple[ConnectorCatalogEntry, ...] = (
         ),
         remote_transport="streamable_http",
     ),
+    ConnectorCatalogEntry(
+        kind="store-perf",
+        name="store-perf",
+        description=(
+            "store-perf 工具名：get_data_latest、submit_preload、run_analysis、"
+            "drill_metric、get_report。"
+            "kickoff §6.3 端点：POST /drill、POST /analysis/run、GET /detail-excel。"
+            "不实现 :8787 服务。"
+        ),
+        auth_kind="personal_token",
+        doc_url="https://developer.cloud.tencent.com/mcp/server/11803",
+        icon="tencent-docs",
+        color="#0052d9",
+        phase="available",
+        mcp_mode="remote",
+        category="professional",
+        allowed_tools=(
+            "get_data_latest",
+            "submit_preload",
+            "run_analysis",
+            "drill_metric",
+            "get_report",
+        ),
+    ),
 )
 
 

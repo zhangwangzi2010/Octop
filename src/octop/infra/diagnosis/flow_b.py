@@ -3,7 +3,7 @@
 Stage 1 builds context without an LLM. Stage 2 may call an LLM only to
 produce an interpretation, then the existing contract gate decides FAIL.
 Skill asset names and report headings are the ones already written in the
-spec. SOUL step names are not invented here.
+spec. SOUL titles are the five inline steps from kickoff §6.1.1.
 """
 
 from __future__ import annotations
@@ -55,8 +55,14 @@ def load_skills() -> tuple[dict[str, Any], ...]:
 
 
 def soul_steps() -> tuple[str, ...]:
-    """SOUL step titles are not written in the spec."""
-    return ()
+    """Inline SOUL titles from kickoff §6.1.1. They are not a skill asset."""
+    return (
+        "① read_file 读取本 run 的切片（slice.json）",
+        "② 只解读 hit=true 的项（个体优先 / 权重降序；共性带过，不展开）",
+        "③ 按契约 write_file interpretation.json（headline / overall / findings / actions / risks，含 data_refs）",
+        "④ execute 强制校验（scripts/validate_*.py：结构 + data_refs 数值逐条核对；不过 → 必须改，禁止静默降级）",
+        "⑤ 一行收尾（结论 + 命中最重项）",
+    )
 
 
 def causal_chain_links() -> tuple[str, ...]:
