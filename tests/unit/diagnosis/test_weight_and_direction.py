@@ -75,15 +75,20 @@ def test_multi_hit_fixture_sorts_top5_and_grades_direction_hits(tmp_path: Any) -
     assert by_store["m"]["hits"] == ("C-S11", "C-S14", "C-S16")
     assert by_store["m"]["individual_weight"] == 35
     assert by_store["m"]["total_weight"] == 35
-    assert by_store["a"]["individual_weight"] == 20
+    assert by_store["a"]["hits"] == ("C-S09", "C-S15")
+    assert by_store["a"]["individual_weight"] == 25
     assert by_store["a"]["total_weight"] == 25
+    assert _latest(data_dir, "m", "延迟发货率") == 0.01
+    assert by_store["d"]["hits"] == ("C-S09",)
+    assert by_store["d"]["individual_weight"] == 5
+    assert "延迟发货率" not in report["commonality"]
     assert by_store["b"]["individual_weight"] == 20
     assert by_store["b"]["total_weight"] == 20
     assert by_store["c"]["individual_weight"] == 15
     assert by_store["s"]["individual_weight"] == 5
     assert set(report["groups"]["P0"]) == {"m", "s"}
     assert set(report["groups"]["P1"]) == {"a", "b", "c"}
-    assert report["groups"]["P2"] == ()
+    assert report["groups"]["P2"] == ("d",)
     assert report["top5"] == ("m", "a", "b", "c", "s")
     assert "d" not in report["top5"]
     assert "总权重" not in " ".join(report["gaps"])
@@ -159,6 +164,13 @@ def _write(
     for name, previous in prev.items():
         metrics[name]["prev"] = previous
     write_snapshot(str(data_dir), shop_id, document)
+
+
+def _latest(data_dir: Any, shop_id: str, metric: str) -> Any:
+    import json
+
+    document = json.loads((data_dir / f"{shop_id}.json").read_text(encoding="utf-8"))
+    return document["store_performance"]["metrics"][metric]["latest"]
 
 
 def _fn(module_name: str, name: str) -> Any:
