@@ -2,8 +2,8 @@
 
 Reads snapshots through snapshot_store. Diagnosis uses the existing flow B
 and the locked hit, commonality, and priority functions. C-S11 and C-S14
-use the sign of the period change. Drill routes and level-1 derived values
-are recorded as gaps.
+use the sign of the period change. Drill routes hang off the routing table.
+Level-1 derived values are recorded as a gap.
 """
 
 from __future__ import annotations
@@ -14,7 +14,13 @@ from contextlib import suppress
 from typing import Any
 
 from octop.infra.db.repos.diagnosis_runs import DiagnosisRunsRepo
-from octop.infra.diagnosis.flow_b import diagnose_item, report_sections, synthesize_report
+from octop.infra.diagnosis.flow_b import (
+    diagnose_item,
+    drill_route,
+    report_sections,
+    synthesize_report,
+    undrillable_mark,
+)
 from octop.infra.diagnosis.hit_weights import (
     common_hit_rate,
     counts_toward_common_denominator,
@@ -38,10 +44,7 @@ from octop.infra.diagnosis.symptom_engine import (
     score_band,
 )
 
-_GAPS: tuple[str, ...] = (
-    "analysis_guide 分流表没有正文",
-    "一级派生展示值不从快照现算",
-)
+_GAPS: tuple[str, ...] = ("一级派生展示值不从快照现算",)
 _PHASES: tuple[str, ...] = ("SKIP", "individual", "commonality")
 _PRIORITIES: tuple[str, ...] = ("P0", "P1", "P2")
 FakeLlm = Callable[[str, tuple[object, ...]], Mapping[str, Any]]
@@ -108,6 +111,7 @@ def run_fixture(
         "groups": groups,
         "top5": _top5(phases, common),
         "store_weights": _store_weights(phases, common),
+        "drills": _drills(phases),
         "commonality": _common_names(loaded, common),
         "gaps": _GAPS,
         "items": tuple(
@@ -456,6 +460,24 @@ def _store_weights(
             }
         )
     return tuple(weighed)
+
+
+def _drills(rows: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
+    found: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        for metric_id in _hit_ids(row):
+            if metric_id in seen:
+                continue
+            seen.add(metric_id)
+            found.append(
+                {
+                    "metric_id": metric_id,
+                    "route": drill_route(metric_id),
+                    "mark": undrillable_mark(metric_id),
+                }
+            )
+    return tuple(found)
 
 
 def _groups(

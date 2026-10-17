@@ -11,9 +11,16 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
+from octop.infra.diagnosis.hit_weights import (
+    hit_rule,
+    metric_ids,
+    metric_name,
+    metric_weight_percent,
+)
 from octop.infra.diagnosis.l1_semantic import yellow_metric_names
 from octop.infra.diagnosis.orchestrator import contract_gate, retry_policy
 from octop.infra.diagnosis.pop_rules import ratio_pop
+from octop.infra.diagnosis.snapshot_store import performance_table
 
 _SKILL_ASSETS: tuple[str, ...] = (
     "metrics_catalog",
@@ -35,6 +42,8 @@ _TOP_KEYS: tuple[str, ...] = ("headline", "overall", "findings", "actions", "ris
 _FINDING_KEYS: tuple[str, ...] = ("title", "severity", "analysis", "evidence", "data_refs")
 _ACTION_KEYS: tuple[str, ...] = ("title", "detail")
 _STAGE2_TIMEOUT_SECONDS = 600
+_NO_DRILL = "无明细下钻能力"
+_UNDRILLABLE: frozenset[str] = frozenset({"C-S11", "C-S12", "C-S13", "C-S14", "C-S15", "C-S16"})
 
 
 def skill_assets() -> tuple[str, ...]:
@@ -43,15 +52,52 @@ def skill_assets() -> tuple[str, ...]:
 
 
 def load_skills() -> tuple[dict[str, Any], ...]:
-    """Name the four assets. Their bodies are not invented."""
+    """Load the four assets. Only analysis_guide has the routing table."""
+    guide = analysis_guide_body()
     return tuple(
         {
             "name": name,
-            "body": "",
+            "body": guide if name == "analysis_guide" else "",
             "fact_source": name == "metrics_catalog",
         }
         for name in _SKILL_ASSETS
     )
+
+
+def analysis_guide_body() -> str:
+    """Routing table with locked hit lines. C-S09 stays ≥10%."""
+    lines = [
+        "下钻分流。阈值和权重用已锁定命中线。",
+        "可下钻：绩效分、用户评价分（C-S07）、非买家责任退货退款率（C-S08）、"
+        "延迟发货率（C-S09）、延迟到货率（C-S10）。",
+        "不可下钻：缺货率（C-S11）、24 小时回复率（C-S12）、售后准时率（C-S13）、"
+        f"爆旺款率（C-S14）、售罄健康分（C-S15）、活动报名率（C-S16）。{_NO_DRILL}。",
+    ]
+    for metric_id in metric_ids():
+        weight = metric_weight_percent(metric_id)
+        lines.append(
+            f"{metric_id} {metric_name(metric_id)} 权重 {weight:g}% 命中 {hit_rule(metric_id)}"
+        )
+    return "\n".join(lines)
+
+
+def drill_route(name: str) -> str | None:
+    """Detail route for a drillable item. The other six have none."""
+    routes = {
+        "绩效分": performance_table(),
+        "C-S07": "评价",
+        "C-S08": "售后",
+        "C-S09": "发货",
+        "C-S10": "到货",
+    }
+    return routes.get(name)
+
+
+def undrillable_mark(name: str) -> str:
+    """The six platform metrics must say they have no detail drill."""
+    if name in _UNDRILLABLE:
+        return _NO_DRILL
+    return ""
 
 
 def soul_steps() -> tuple[str, ...]:
