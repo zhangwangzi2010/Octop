@@ -6,7 +6,7 @@ names, and slice D formulas are not listed.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 _LATE_SHIP_NUMERATOR = "parent_shipping_time > expect_ship_latest_time"
@@ -120,6 +120,17 @@ def pop_magnitude_percent(metric_id: str) -> None:
     """No rise or fall percent is locked."""
     del metric_id
     return None
+
+
+def individual_weight(hit_ids: Sequence[str], common_ids: Collection[str]) -> float:
+    """Sum of hit weights that are not common. Several hits stay a sum."""
+    common = set(common_ids)
+    return sum(metric_weight_percent(metric_id) for metric_id in hit_ids if metric_id not in common)
+
+
+def total_weight(hit_ids: Sequence[str]) -> float:
+    """Sum of every hit weight, including common hits."""
+    return sum(metric_weight_percent(metric_id) for metric_id in hit_ids)
 
 
 def document_numerator(metric_id: str) -> str | None:

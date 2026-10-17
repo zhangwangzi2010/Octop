@@ -103,7 +103,7 @@ def test_two_shops_get_two_files(tmp_path: Path) -> None:
 
 
 def test_written_json_keeps_only_the_promoted_keys(tmp_path: Path) -> None:
-    """落盘只留形状字段、规范分和 Q4 短名，窗口与物理列名不入库。"""
+    """落盘只留形状字段、规范分、Q4 短名和可选 prev。窗口与物理列名不入库。"""
     document = _document()
     document["window_start"] = "2026-10-01"
     document["window_end"] = "2026-10-15"
@@ -121,7 +121,9 @@ def test_written_json_keeps_only_the_promoted_keys(tmp_path: Path) -> None:
     assert performance["mall_check_score"] != performance["perf_score"]
     assert set(performance["metrics"]) == set(metric_json_keys())
     late_ship = performance["metrics"]["延迟发货率"]
-    assert set(late_ship) == set(q4_output_names())
+    assert set(late_ship) == {*q4_output_names(), "prev"}
+    assert late_ship["prev"] == 0.2
+    assert "indicator_data_detail" not in late_ship
     assert "window_start" not in loaded
     assert "window_end" not in loaded
     assert "business_date" not in loaded

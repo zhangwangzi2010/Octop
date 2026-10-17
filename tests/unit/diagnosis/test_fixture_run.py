@@ -62,7 +62,7 @@ def test_three_store_fixture_reaches_partial_from_snapshot_files(tmp_path: Any) 
     assert 999 not in report["numbers"]
     assert set(report["numbers"]) <= _snapshot_numbers(data_dir)
     assert "analysis_guide 分流表" in " ".join(report["gaps"])
-    assert "总权重" in " ".join(report["gaps"])
+    assert "总权重" not in " ".join(report["gaps"])
     assert metric_weight_percent("C-S07") == 10
     assert score_band(3.4) == "高危"
 

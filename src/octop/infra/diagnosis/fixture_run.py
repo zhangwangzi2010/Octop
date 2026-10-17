@@ -1,8 +1,9 @@
 """Background fixture run.
 
 Reads snapshots through snapshot_store. Diagnosis uses the existing flow B
-and the locked hit, commonality, and priority functions. Drill routes, a
-total-weight formula, and level-1 derived values are recorded as gaps.
+and the locked hit, commonality, and priority functions. C-S11 and C-S14
+use the sign of the period change. Drill routes and level-1 derived values
+are recorded as gaps.
 """
 
 from __future__ import annotations
@@ -17,13 +18,17 @@ from octop.infra.diagnosis.flow_b import diagnose_item, report_sections, synthes
 from octop.infra.diagnosis.hit_weights import (
     common_hit_rate,
     counts_toward_common_denominator,
+    individual_weight,
     judgment_basis,
     metric_ids,
     metric_name,
     metric_weight_percent,
+    pop_direction_hits,
     score_hits,
     stored_ratio_hits,
+    total_weight,
 )
+from octop.infra.diagnosis.pop_rules import pop_direction
 from octop.infra.diagnosis.snapshot_store import read_snapshot, read_store_fetch
 from octop.infra.diagnosis.snapshot_structure import preload_consumable
 from octop.infra.diagnosis.symptom_engine import (
@@ -35,7 +40,6 @@ from octop.infra.diagnosis.symptom_engine import (
 
 _GAPS: tuple[str, ...] = (
     "analysis_guide 分流表没有正文",
-    "总权重没有汇总函数",
     "一级派生展示值不从快照现算",
     "二级清单叶名与锁定指标名不一致，判定读取快照 metrics 的锁定名",
 )
@@ -104,6 +108,7 @@ def run_fixture(
         "yellow_values": tuple(value for row in loaded for value in row["yellow_values"]),
         "groups": groups,
         "top5": _top5(phases, common),
+        "store_weights": _store_weights(phases, common),
         "commonality": _common_names(loaded, common),
         "gaps": _GAPS,
         "items": tuple(
@@ -259,7 +264,9 @@ def _load(data_dir: str, store_id: str) -> dict[str, Any]:
     fetch = read_store_fetch(data_dir, store_id)
     performance = document["store_performance"]
     score = float(performance["mall_check_score"])
-    values = _metric_values(performance.get("metrics"))
+    metrics = performance.get("metrics")
+    values = _metric_values(metrics)
+    prevs = _metric_prevs(metrics)
     yellow_values: list[float] = []
     yellow = fetch["yellow"]
     if isinstance(yellow, tuple):
@@ -270,11 +277,12 @@ def _load(data_dir: str, store_id: str) -> dict[str, Any]:
             if isinstance(raw, bool) or not isinstance(raw, (int, float)):
                 continue
             yellow_values.append(float(raw))
-    hits = _hits(values)
+    hits = _hits(values, prevs)
     return {
         "store_id": store_id,
         "score": score,
         "values": values,
+        "prevs": prevs,
         "hits": hits,
         "yellow_values": yellow_values,
         "role": "SKIP",
@@ -300,7 +308,24 @@ def _metric_values(metrics: object) -> dict[str, float]:
     return values
 
 
-def _hits(values: Mapping[str, float]) -> tuple[str, ...]:
+def _metric_prevs(metrics: object) -> dict[str, float]:
+    """Optional previous values stored for replay. They are not a new column."""
+    if not isinstance(metrics, Mapping):
+        return {}
+    prevs: dict[str, float] = {}
+    for metric_id in metric_ids():
+        name = metric_name(metric_id)
+        raw_metric = metrics.get(name)
+        if not isinstance(raw_metric, Mapping):
+            continue
+        raw = raw_metric.get("prev")
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            continue
+        prevs[name] = float(raw)
+    return prevs
+
+
+def _hits(values: Mapping[str, float], prevs: Mapping[str, float]) -> tuple[str, ...]:
     found: list[str] = []
     for metric_id in metric_ids():
         name = metric_name(metric_id)
@@ -312,9 +337,23 @@ def _hits(values: Mapping[str, float]) -> tuple[str, ...]:
         ratio_hit = basis in {"latest_vs_threshold", "document_ratio"} and stored_ratio_hits(
             metric_id, value
         )
-        if score_hit or ratio_hit:
+        direction_hit = _direction_hit(metric_id, name, value, prevs, basis)
+        if score_hit or ratio_hit or direction_hit:
             found.append(metric_id)
     return tuple(found)
+
+
+def _direction_hit(
+    metric_id: str,
+    name: str,
+    value: float,
+    prevs: Mapping[str, float],
+    basis: str,
+) -> bool:
+    if basis != "pop_direction" or name not in prevs:
+        return False
+    label = pop_direction(value, prevs[name])
+    return label is not None and pop_direction_hits(metric_id, label)
 
 
 def _common_metrics(rows: Sequence[Mapping[str, Any]]) -> frozenset[str]:
@@ -395,14 +434,29 @@ def _numbers(rows: Sequence[Mapping[str, Any]]) -> tuple[float, ...]:
     return tuple(found)
 
 
-def _individual_weight(row: Mapping[str, Any], common: frozenset[str]) -> float:
+def _hit_ids(row: Mapping[str, Any]) -> tuple[str, ...]:
     hits = row["hits"]
     if not isinstance(hits, tuple):
-        return 0
-    chosen = [metric_id for metric_id in hits if metric_id not in common]
-    if len(chosen) != 1:
-        return 0
-    return metric_weight_percent(chosen[0])
+        return ()
+    return tuple(str(metric_id) for metric_id in hits)
+
+
+def _store_weights(
+    rows: Sequence[Mapping[str, Any]],
+    common: frozenset[str],
+) -> tuple[dict[str, Any], ...]:
+    weighed: list[dict[str, Any]] = []
+    for row in rows:
+        hits = _hit_ids(row)
+        weighed.append(
+            {
+                "store_id": str(row["store_id"]),
+                "hits": hits,
+                "individual_weight": individual_weight(hits, common),
+                "total_weight": total_weight(hits),
+            }
+        )
+    return tuple(weighed)
 
 
 def _groups(
@@ -413,14 +467,21 @@ def _groups(
     for row in rows:
         if row["role"] != "individual":
             continue
-        priority = individual_priority(_individual_weight(row, common), float(row["score"]))
+        hits = _hit_ids(row)
+        priority = individual_priority(individual_weight(hits, common), float(row["score"]))
         grouped[priority].append(str(row["store_id"]))
     return {name: tuple(grouped[name]) for name in _PRIORITIES}
 
 
 def _top5(rows: Sequence[Mapping[str, Any]], common: frozenset[str]) -> tuple[str, ...]:
     ranked = [row for row in rows if row["role"] == "individual"]
-    ranked.sort(key=lambda row: (-_individual_weight(row, common), float(row["score"])))
+    ranked.sort(
+        key=lambda row: (
+            -individual_weight(_hit_ids(row), common),
+            -total_weight(_hit_ids(row)),
+            float(row["score"]),
+        )
+    )
     return tuple(str(row["store_id"]) for row in ranked[:5])
 
 

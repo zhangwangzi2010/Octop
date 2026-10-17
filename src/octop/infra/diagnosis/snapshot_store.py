@@ -136,6 +136,10 @@ def build_snapshot(
         for physical, short in _physical_pairs():
             if physical in row:
                 metrics[indicator][short] = _passthrough(row[physical])
+        if "prev" in row:
+            stored_prev = _passthrough(row["prev"])
+            if stored_prev is not None:
+                metrics[indicator]["prev"] = stored_prev
     return _document(shop, subject, owner, mall_check_score, perf_score, score_level, metrics)
 
 
@@ -246,6 +250,10 @@ def _metrics_from(raw: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
         for short in metric_value_keys():
             if short in incoming:
                 metrics[key][short] = _passthrough(incoming[short])
+        if "prev" in incoming:
+            stored_prev = _passthrough(incoming["prev"])
+            if stored_prev is not None:
+                metrics[key]["prev"] = stored_prev
     return metrics
 
 
