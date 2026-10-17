@@ -155,18 +155,25 @@ def hit_line_percent(metric: str) -> float | None:
 
 
 def strategy_metric_names() -> tuple[str, ...]:
-    """Empty. Strategy metric names are not invented."""
+    """Decided empty. Extra strategy metric names are not a pending gap."""
     return ()
 
 
 def fulfillment_column_names() -> tuple[str, ...]:
-    """Empty. The 139 fulfillment columns are not invented."""
+    """Decided empty. There is no fulfillment wide table."""
     return ()
 
 
 def after_sales_class_names() -> tuple[str, ...]:
-    """Empty. The six after-sales class names are not invented."""
-    return ()
+    """The six decided class names. 9-未分类 is only the SQL ELSE fallback."""
+    return (
+        "1-物流履约",
+        "2-产品满意度",
+        "3-商品价格",
+        "4-店铺原因",
+        "5-平台原因",
+        "6-其他原因",
+    )
 
 
 def yellow_metric_names() -> tuple[str, ...]:

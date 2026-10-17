@@ -224,7 +224,14 @@ def test_ratios_without_document_numerator_do_not_invent_columns() -> None:
         assert numerator(metric_id) is None
     assert _texts("fulfillment_column_names") == ()
     assert _texts("strategy_metric_names") == ()
-    assert _texts("after_sales_class_names") == ()
+    assert _texts("after_sales_class_names") == (
+        "1-物流履约",
+        "2-产品满意度",
+        "3-商品价格",
+        "4-店铺原因",
+        "5-平台原因",
+        "6-其他原因",
+    )
 
 
 def test_common_hit_rate_excludes_yellow_gaps() -> None:

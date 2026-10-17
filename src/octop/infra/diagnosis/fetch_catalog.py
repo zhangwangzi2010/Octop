@@ -88,12 +88,12 @@ def l1_age_displays() -> tuple[tuple[str, str], ...]:
 
 
 def product_strategy_dimensions() -> tuple[str, ...]:
-    """Frozen strategy dimension values. Metric names under them are not invented."""
+    """Frozen strategy dimension values."""
     return _PRODUCT_STRATEGY_DIMENSIONS
 
 
 def product_strategy_metric_names() -> tuple[str, ...]:
-    """Empty until the spec names strategy metrics."""
+    """Decided empty. Strategy slices use the three SPU overview columns."""
     return ()
 
 

@@ -9,7 +9,7 @@ Expected surface once the module exists. Values are display strings only:
 - ``l1_display_names() -> Sequence[str]`` — 19 names (6 overall + 11 TOP X + 2 品类)
 - ``l1_age_displays() -> Sequence[tuple[str, str]]`` — 8 ``(band, metric)`` pairs
 - ``product_strategy_dimensions() -> Sequence[str]``
-- ``product_strategy_metric_names() -> Sequence[str]`` — empty; names are not invented
+- ``product_strategy_metric_names() -> Sequence[str]`` — decided empty
 - ``l2_leaves() -> Sequence[tuple[str, str]]`` — 25 ``(checklist, leaf)`` pairs
 - ``drill_triggers() -> Sequence[str]`` — four §6.3 trigger strings
 - ``yellow_labels() -> Sequence[str]`` — the five yellow labels, exact spelling
@@ -118,7 +118,7 @@ def test_l1_catalog_has_twenty_seven_display_names() -> None:
 
 
 def test_product_strategy_keeps_dimensions_and_does_not_invent_metrics() -> None:
-    """维度已冻。指标名待补，不计入 27 项。"""
+    """维度是原创款、跟卖款、裂变款。额外指标名已拍板为空，不计入 27 项。"""
     dimensions = _texts("product_strategy_dimensions")
     metrics = _texts("product_strategy_metric_names")
     names = _texts("l1_display_names")

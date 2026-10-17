@@ -599,6 +599,30 @@ _CATALOG: tuple[ConnectorCatalogEntry, ...] = (
         ),
         remote_transport="streamable_http",
     ),
+    ConnectorCatalogEntry(
+        kind="store-perf",
+        name="store-perf",
+        description=(
+            "store-perf 工具名：get_data_latest、submit_preload、run_analysis、"
+            "drill_metric、get_report。"
+            "kickoff §6.3 端点：POST /drill、POST /analysis/run、GET /detail-excel。"
+            "不实现 :8787 服务。"
+        ),
+        auth_kind="api_key",
+        doc_url="https://ucnbkepnx9u9.feishu.cn/wiki/UGlmwS7rsiqRs2kKpcEcLwuInbU",
+        icon="store-perf",
+        color="#0052d9",
+        phase="coming_soon",
+        mcp_mode="remote",
+        category="professional",
+        allowed_tools=(
+            "get_data_latest",
+            "submit_preload",
+            "run_analysis",
+            "drill_metric",
+            "get_report",
+        ),
+    ),
 )
 
 

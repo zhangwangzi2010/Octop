@@ -4,7 +4,7 @@
 - [ ] 1.2 冻结数据契约：Q1~Q5 口径、快照 schema v2、metrics_catalog 阈值拍板值（C-S09 2% / C-S12 90% / C-S13 95%）。非黄标指标从 data_agent 语义层核对指标 ID、表字段、分区、时间窗和量纲，并记录对应 SQL 模板；上述黄标五项只登记 `fetchable=false`，不编造映射值
 - [ ] 1.3 固化固定 SQL 构造原则：白名单 + 参数绑定 + 分区裁剪 + 禁止 LLM 生成/改写 SQL；RAG 运行时不进入 Octop 诊断链路。取数失败显式失败或标记数据不足，不用模型补数
 - [ ] 1.4 建立 `feature/store-diagnosis` 主干与 WT-1~WT-6 worktree 分支映射（合并顺序：DB → Orchestrator → API → Agent → UI → E2E）
-- [ ] 1.5 注（未完成，不要勾选）：取数展示名已写入 `specs/diagnosis-fetch-fields/spec.md`。第一级 27 个展示名、第二级检查单 25 个叶子、需求 6.3 四类下钻用词以该规格为准。商品策略结构仍是「维度已冻、指标名待补」。JSON 键、文件路径、比率量纲、SQL 列未冻结。本项不代表取数实现完成
+- [ ] 1.5 注（未完成，不要勾选）：取数展示名已写入 `specs/diagnosis-fetch-fields/spec.md`。第一级 27 个展示名、第二级检查单 25 个叶子、需求 6.3 四类下钻用词以该规格为准。已拍板：额外指标名为空；策略切片只用 SPU 概览三列。已拍板：履约 139 列为空 / 无此宽表。已拍板：六个售后类名依次是 1-物流履约、2-产品满意度、3-商品价格、4-店铺原因、5-平台原因、6-其他原因；9-未分类只作 SQL ELSE 回退，不进入元组。JSON 键、文件路径、比率量纲、SQL 列未冻结。本项不代表取数实现完成
 
 ## 2. DB + 数据层（WT-1）
 
@@ -36,7 +36,12 @@
 ## 5. Agent 与流程 B（WT-4）
 
 - [ ] 5.1 [RED] 契约门禁测试：结论 schema 校验失败与 data_refs 数字不一致 → item FAIL
-- [ ] 5.2 诊断专家 Agent（SOUL 五步工作流）+ 4 份 Skill 资产（metrics_catalog / analysis_guide / drilldown_playbook / query_tasks）加载
+- [ ] 5.2 诊断专家 Agent（SOUL 五步工作流）+ 4 份 Skill 资产（metrics_catalog / analysis_guide / drilldown_playbook / query_tasks）加载。五步是 kickoff §6.1.1 已批准的 SOUL 内联工作流，不是 Skill。四份 Skill 资产仍按名字加载。流程 A 保持零 LLM。标题依次是：
+  - ① read_file 读取本 run 的切片（slice.json）
+  - ② 只解读 hit=true 的项（个体优先 / 权重降序；共性带过，不展开）
+  - ③ 按契约 write_file interpretation.json（headline / overall / findings / actions / risks，含 data_refs）
+  - ④ execute 强制校验（scripts/validate_*.py：结构 + data_refs 数值逐条核对；不过 → 必须改，禁止静默降级）
+  - ⑤ 一行收尾（结论 + 命中最重项）
 - [ ] 5.3 store-perf MCP connector：5 工具注册与配置；入参透传 run_id / store_id
 - [ ] 5.4 两段式 diagnose + attempt+1 换会话 + thread 命名 `diag:{run_id}:{store_id}:a{attempt}`
 - [ ] 5.5 报告五段合成 summarize + PARTIAL 附录 + 失败降级拼接
