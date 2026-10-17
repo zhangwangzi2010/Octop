@@ -160,7 +160,7 @@ def test_store_and_subject_use_their_own_scores() -> None:
 
 
 def test_uncovered_rules_have_no_placeholder_percents() -> None:
-    """未覆盖规则不输出占位百分数，也不编造六个售后类名。"""
+    """未覆盖规则不输出占位百分数。售后类名使用已拍板的六个名字。"""
     hit_line = _fn("hit_line_percent")
     assert hit_line("延迟发货率") == 10
     assert hit_line("24 小时回复率") == 90
@@ -169,7 +169,14 @@ def test_uncovered_rules_have_no_placeholder_percents() -> None:
         assert hit_line(name) is None
     assert _texts("strategy_metric_names") == ()
     assert _texts("fulfillment_column_names") == ()
-    assert _texts("after_sales_class_names") == ()
+    assert _texts("after_sales_class_names") == (
+        "1-物流履约",
+        "2-产品满意度",
+        "3-商品价格",
+        "4-店铺原因",
+        "5-平台原因",
+        "6-其他原因",
+    )
 
 
 def test_yellow_metrics_stay_unqueried_on_the_judgment_path() -> None:

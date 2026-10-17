@@ -1,4 +1,4 @@
-"""策略额外指标名与履约宽表列名已拍板为空。六个售后类名仍阻断。"""
+"""策略额外指标名与履约宽表列名已拍板为空。"""
 
 from __future__ import annotations
 
@@ -9,18 +9,12 @@ from octop.infra.diagnosis.fetch_catalog import (
     product_strategy_metric_names,
 )
 from octop.infra.diagnosis.hit_weights import (
-    after_sales_class_names as hit_after_sales_class_names,
-)
-from octop.infra.diagnosis.hit_weights import (
     fulfillment_column_names as hit_fulfillment_column_names,
 )
 from octop.infra.diagnosis.hit_weights import (
     strategy_metric_names as hit_strategy_metric_names,
 )
 from octop.infra.diagnosis.l1_semantic import strategy_metric_names as l1_strategy_metric_names
-from octop.infra.diagnosis.symptom_engine import (
-    after_sales_class_names as symptom_after_sales_class_names,
-)
 from octop.infra.diagnosis.symptom_engine import (
     fulfillment_column_names as symptom_fulfillment_column_names,
 )
@@ -40,7 +34,7 @@ _DOC_PATHS = (
 
 
 def test_strategy_and_fulfillment_empties_are_decided() -> None:
-    """空元组是已拍板结果。规格、设计、任务写明两句结论，售后类名仍不关闭。"""
+    """空元组是已拍板结果。规格、设计、任务写明两句结论。"""
     assert product_strategy_dimensions() == STRATEGY_DIMENSIONS
     assert product_strategy_metric_names() == ()
     assert l1_strategy_metric_names() == ()
@@ -48,8 +42,6 @@ def test_strategy_and_fulfillment_empties_are_decided() -> None:
     assert hit_strategy_metric_names() == ()
     assert symptom_fulfillment_column_names() == ()
     assert hit_fulfillment_column_names() == ()
-    assert symptom_after_sales_class_names() == ()
-    assert hit_after_sales_class_names() == ()
 
     for path in _DOC_PATHS:
         text = path.read_text(encoding="utf-8")
@@ -60,4 +52,3 @@ def test_strategy_and_fulfillment_empties_are_decided() -> None:
         assert "139 列待补" not in text
         assert "列名待完整清单" not in text
         assert "履约表 139 个列名" not in text
-        assert "已拍板：六个售后类名" not in text
