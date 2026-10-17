@@ -958,6 +958,20 @@ def test_every_catalog_entry_has_category():
         assert entry.category == category
 
 
+def test_store_perf_catalog_labels_auth_doc_icon_as_undecided():
+    """store-perf 的认证、文档和图标必须标成占位，且阶段不是已可用。"""
+    entry = get_catalog_entry("store-perf")
+    assert entry is not None
+    assert entry.phase == "coming_soon"
+    visible = " ".join(
+        part for part in (entry.description, entry.auth_hint) if isinstance(part, str)
+    )
+    assert "占位，待拍板" in visible
+    assert "auth_kind" in visible
+    assert "doc_url" in visible
+    assert "icon" in visible
+
+
 def test_oauth_ready_notion():
     from octop.infra.connectors.oauth import oauth_ready_for_kind
 
