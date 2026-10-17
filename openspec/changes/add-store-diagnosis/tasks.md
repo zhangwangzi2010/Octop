@@ -74,9 +74,11 @@
 
 ## 已知缺口
 
-- [ ] 分流表正文。缺：`analysis_guide` 没有正文，没有下钻路由。
-- [ ] 总权重汇总。缺：没有汇总函数。排序只用已锁定的单指标权重和 `mall_check_score`。
-- [ ] 一级派生现算。缺：一级展示值不从快照现算。
-- [ ] 清单叶子名和锁定指标名不一致。缺：清单叶名与锁定指标名不是同一套，没有新的别名。
-- [ ] 环比方向。缺：快照没有 C-S11 缺货率、C-S14 爆旺款率的升降方向。
+- [x] 分流表正文。证据：绿灯 `c015c010`；测试 `tests/unit/diagnosis/test_analysis_guide.py::test_analysis_guide_body_uses_locked_lines`、`test_drill_routes_cover_five_and_mark_six`、`test_fixture_hangs_the_drill_route`。
+- [x] 总权重汇总。证据：绿灯 `7925473a`；测试 `tests/unit/diagnosis/test_weight_and_direction.py::test_individual_weight_drops_common_hits_and_total_keeps_them`、`test_multi_hit_fixture_sorts_top5_and_grades_direction_hits`。
+- [x] 一级派生现算（最小集）。证据：绿灯 `f33cad8f`；测试 `tests/unit/diagnosis/test_l1_live.py::test_live_minimal_computes_pop_contribution_and_weight_index`、`test_two_level_fetch_applies_windows_and_marks_gaps`。调用方给出窗口时按已锁公式现算。TOP X 的 X 和无公式项不在本项里。快照文件仍没有一级底字段，夹具缺口句「一级派生展示值不从快照现算」仍在。
+- [ ] TOP X 的 X。缺：没有把 X 定成某个数的提交。凡是「Top x …」展示名保持空并标 gap。`tests/unit/diagnosis/test_l1_live.py::test_formula_gaps_and_unknown_age_spellings_stay_empty` 只锁定 `top_x` 为空。
+- [ ] 无公式的一级展示名。缺：订单量下滑占比、下滑SPU数占比、动销SPU下滑占比、在售SPU下滑占比没有已锁公式，保持空并标 gap。没有为它们补公式的提交。`tests/unit/diagnosis/test_l1_live.py::test_formula_gaps_and_unknown_age_spellings_stay_empty` 只锁定这些名字留在 gaps 里。
+- [x] 清单叶子名和锁定指标名不一致。证据：绿灯 `acca0f58`；测试 `tests/unit/diagnosis/test_leaf_aliases.py::test_leaf_aliases_do_not_change_json_keys`、`test_level2_reads_aliased_leaves_from_locked_keys`。
+- [x] 环比方向。证据：绿灯 `c28dd964`；测试 `tests/unit/diagnosis/test_weight_and_direction.py::test_direction_is_the_sign_and_ignores_five_percent_bands`、`test_multi_hit_fixture_sorts_top5_and_grades_direction_hits`。
 - [ ] 真实数仓 / :8787。缺：没有数仓连接，也没有 :8787 服务。
