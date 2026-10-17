@@ -456,7 +456,7 @@ async def test_catalog_weknora_dify_last(env):
     assert kinds.index("feishu-cli") < kinds.index("weknora")
     assert kinds.index("wecom-cli") < kinds.index("dify")
     assert kinds.index("didi") < kinds.index("weknora")
-    assert kinds[-2:] == ["weknora", "dify"]
+    assert kinds[-3:] == ["weknora", "dify", "store-perf"]
 
 
 async def test_install_cli_forbidden_for_non_admin(env):
