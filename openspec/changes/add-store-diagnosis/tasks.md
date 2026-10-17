@@ -9,23 +9,23 @@
 
 ## 2. DB + 数据层（WT-1）
 
-- [ ] 2.1 [RED] 迁移与版本断言失败测试：`tests/unit/db/test_db_pool.py` v21 起逐批递增
-- [ ] 2.2 第一批 021 迁移对：diag_node_events + diag_runs 加列 + client_request_id 幂等查重
+- [ ] 2.1 [RED] 迁移与版本断言：`tests/unit/db/test_db_pool.py` 的诊断水位一次升到 v21。不预期 v22、v23 或迁移文件 022 / 023
+- [ ] 2.2 迁移对 `021_diagnosis_runs`（`.sql` / `.pg.sql`）创建 `diag_runs`、`diag_run_items`、`diag_node_events`。`diag_runs.client_request_id` 有唯一约束。不把本项写成在已有诊断表上加列，也不另开 022
 - [ ] 2.3 repo：`repos/diagnosis_runs.py` CRUD + 事件写入 + owner 过滤（单测覆盖 SQLite 与 PG 方言）
 - [ ] 2.4 boot `reset_orphan_items` 断点恢复 + 单测（崩溃场景）
-- [ ] 2.5 第二批 022 迁移对：attempt 多行化 + 批次头表 + 五阶段状态列 + 取消字段；db 回归
+- [ ] 2.5 不新增 022。`attempt` 已在 021 的 `diag_run_items`。批次头表、五阶段状态列、取消字段不在已拍板的列里，不新造这些列
 - [ ] 2.6 快照存储：一店一文件 schema v2 读写 + 周期解析确定性单测
 
 ## 3. 编排器与流程 A（WT-2）
 
 - [ ] 3.1 [RED] 五阶段状态机非法迁移测试 + 节点超时 / 重试表测试
 - [ ] 3.2 DiagnosisOrchestrator：状态机、Semaphore 并发、取消、diag_node_events 事件流水
-- [ ] 3.3 症状规则引擎：阈值 / 环比（算法与分档以 3.8 为准） / 共性 ≥40% / 分级 / 影响度排序手算一致单测；thresholds.json 配置化。健康判定只统计 `fetchable=true` 的范围内指标
+- [ ] 3.3 症状规则引擎属于 WT-1，不属于 WT-2。代码在 `src/octop/infra/diagnosis/symptom_engine.py`。共性 ≥40%、个体分级和影响度使用已锁定公式。健康判定只统计 `fetchable=true` 的范围内指标。命中标注句子仍是「运行时按 thresholds.json 计算」，本项不新造另一套阈值，也不把引擎改派给编排器
 - [ ] 3.4 节点实现：ensure_data_ready（30min ×3）、analysis_run（900s ×2）、route 分流、diagnose 段1（60s ×2）、summarize（600s 降级）
 - [ ] 3.5 预加载版本与状态门禁：`COMPLETED + row_count > 0` 才进入分析；`RUNNING` 幂等去重，`FAILED` 支持人工重试并记录事件
 - [ ] 3.6 流程 A 零 LLM 全链路单测（`tests/unit/diagnosis/test_flow_a.py`）与健康店 SKIPPED。仅黄标指标不可取数、其余可取数指标未越阈时，店铺仍为 SKIPPED
 - [ ] 3.7 Cron 每日 13:00 触发挂点 + 幂等（重复触发不产生重复 run）
-- [ ] 3.8 [RED] 环比与可取数单测 `tests/unit/diagnosis/test_pop_rules.py`（实现症状引擎时先红后绿）。覆盖：公式 `(本期-上期)/上期×100%`；等长 7 天累计不做日均；比率 `sum(分子)/sum(分母)`，天数相等或不等都不使用日比率均值；仅累计指标在两侧天数不等时用日均；上期为 0、缺失或比率分母合计为 0 时不产生环比数值；正向指标下降、负向指标上升按轻微 `5%≤w<10%`、一般 `10%≤w≤20%`、严重 `w>20%` 分档，好转方向不入档；库存、推广 roas、流量异常（建议调价未调价）、流量异常SPU数占比、推广 Roas 均为 `fetchable=false` 并 SKIP，不产生数值。验证：`uv run pytest tests/unit/diagnosis/test_pop_rules.py -q`。完成判定：上述场景全部通过，且测试夹具不含这五项黄标指标的伪造数值
+- [ ] 3.8 [RED] 环比与可取数单测 `tests/unit/diagnosis/test_pop_rules.py` 随 WT-1 的症状引擎落地，不改属 WT-2。覆盖：公式 `(本期-上期)/上期×100%`；等长 7 天累计不做日均；比率 `sum(分子)/sum(分母)`，天数相等或不等都不使用日比率均值；仅累计指标在两侧天数不等时用日均；上期为 0、缺失或比率分母合计为 0 时不产生环比数值；正向指标下降、负向指标上升按轻微 `5%≤w<10%`、一般 `10%≤w≤20%`、严重 `w>20%` 分档，好转方向不入档；库存、推广 roas、流量异常（建议调价未调价）、流量异常SPU数占比、推广 Roas 均为 `fetchable=false` 并 SKIP，不产生数值。验证：`uv run pytest tests/unit/diagnosis/test_pop_rules.py -q`。完成判定：上述场景全部通过，且测试夹具不含这五项黄标指标的伪造数值
 
 ## 4. API（WT-3）
 

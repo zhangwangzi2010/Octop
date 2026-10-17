@@ -1,11 +1,11 @@
 ## Context
 
-- 宿主：Octop（Python 3.12 + FastAPI + React/Vite + uv），模块边界与迁移规范见根目录 `AGENTS.md`；DB 当前 schema v20，迁移必须成对（`.sql` + `.pg.sql`）。
-- 验收权威（绑定）：飞书需求文档是验收 SoT，`https://ucnbkepnx9u9.feishu.cn/docx/GTPJdXujnom2WnxgUFVcU2Bonsb`。2026-10-16 用户确认的环比截图（7 天周期环比公式、等长窗口用周期合计、比率用分子分母合计、仅在两侧天数不等时对累计指标做日均、轻微/一般/严重下滑分档、负向指标上升为恶化、正向指标下降为恶化）同为绑定约束。黄标以飞书看板单元格为准，完整集合为：库存、推广 roas、流量异常（建议调价未调价）、流量异常SPU数占比、推广 Roas；五项均 `fetchable=false`。早先口头子集不替代这份看板清单。需求文档正文与截图分档百分数若不一致，先按需求文档修订本规格再实现。
+- 宿主：Octop（Python 3.12 + FastAPI + React/Vite + uv），模块边界与迁移规范见根目录 `AGENTS.md`。诊断库表是单一迁移对 `021_diagnosis_runs.sql` / `021_diagnosis_runs.pg.sql`，水位 v20 → v21。没有 022、023。迁移仍须成对（`.sql` + `.pg.sql`）。
+- 验收权威（绑定）：飞书需求文档是验收 SoT，`https://ucnbkepnx9u9.feishu.cn/docx/GTPJdXujnom2WnxgUFVcU2Bonsb`。2026-10-16 用户确认的环比截图（7 天周期环比公式、等长窗口用周期合计、比率用分子分母合计、仅在两侧天数不等时对累计指标做日均、轻微/一般/严重下滑分档、负向指标上升为恶化、正向指标下降为恶化）同为绑定约束。黄标以飞书看板单元格为准，完整集合为：库存、推广 roas、流量异常（建议调价未调价）、流量异常SPU数占比、推广 Roas；五项均 `fetchable=false`。早先口头子集不替代这份看板清单。环比分档百分数以 2026-10-16 截图为准。C-S09 / C-S12 / C-S13 的验收常量是来源 A：≥10% / <90% / <95%。来源 B 的 ≥2% 不是验收常量。
 - 架构 wiki（飞书架构方案 / 整合版）只作为框架技术参考，内容可能不完整。与 wiki 不一致不阻塞验收，也不得用 wiki 覆盖需求文档、环比截图或黄标清单。
 - 本地参照：`docs/diagnosis-design/`（精简版 v2）与 `skill-verify/shop-diagnosis-kickoff-prompt.md` 为非绑定参考。
 - 数据事实参考：`data_agent_total_zhilong/backend/app/plugins/rag_retrieval/resources/semantic_layer/` 的店铺绩效指标/表/时间口径，以及 `backend/app/skills_analysis/store_performance_analysis/` 的固定 Q1~Q5、下钻、预加载与分析逻辑。该参考只给非黄标指标提供口径和 SQL 模板，不改变飞书需求边界，不移植 RAG 运行时。本仓库 HEAD 未包含该 data_agent 树。
-- 实现对照：HEAD `0576cad3` 无 `infra/diagnosis/`、症状规则引擎或环比单测，没有与本补丁冲突的既有实现需要改写。环比与黄标规则先冻结在规格中，实现阶段按 tasks 3.8 用单测锁定。
+- 实现对照：诊断代码在 `infra/diagnosis/`。症状规则引擎和环比单测属于 WT-1，不属于 WT-2。环比与黄标规则以本规格和 `diagnosis-promoted-contracts` 为准。
 - 既有能力：诊断数据服务（:8787，MCP 5 工具）已存在不动；Agent 运行时为 octop-harness；编排需进程内直调 Agent（Route-D）。
 
 ## Goals / Non-Goals
@@ -28,11 +28,11 @@
 
 1. **Route-D 进程内编排**：DiagnosisOrchestrator 放在 `infra/diagnosis/`，经 `SharedServices` 直调 Agent 与 repos，不建独立编排服务。备选（独立编排进程）被否：跨进程状态同步与部署复杂度不匹配当前规模。
 2. **代码 DAG + 五阶段状态机**：调度与可靠性由编排层兜底（节点超时重试、条件更新认领、boot 恢复、Semaphore 并发），不依赖模型自觉；归因空间用 ≤5 项白名单收敛，ReAct 足够。
-3. **迁移三批低冲突落地（021~023）**：第一批零冲突（node_events 表 + runs 加列 + client_request_id 幂等查重 + boot 恢复 + owner 过滤）；第二批独立迁移回归（attempt 多行化 + 批次头表 + 五阶段状态列 + 取消）；第三批承载流程 A / B 完整链路。资源表遵循 `id` 整数 PK + 公共字符串 ID 唯一、子表存字符串 ID 的项目规范。
+3. **诊断库表一次落到 v21**：未发布的诊断 DDL 折进单一迁移对 `021_diagnosis_runs`。表是 `diag_runs`、`diag_run_items`、`diag_node_events`，列以该迁移文件为准。`attempt` 已在 `diag_run_items`。没有 022、023，也不另建批次头表、五阶段状态列或取消字段。资源表遵循 `id` 整数 PK + 公共字符串 ID 唯一、子表存字符串 ID 的项目规范。
 4. **两段式 diagnose + 契约门禁**：段1 确定性上下文与 LLM 解读分离；结论 JSON schema 校验 + data_refs 逐条核对，失败判 FAIL 并 attempt+1 换会话，不静默降级。
-5. **MCP connector + Skill 资产**：store-perf 5 工具经 connector 注册；归因思路沉淀在 4 份 Skill 资产（metrics_catalog 为唯一事实源，阈值冲突按影响文档拍板）。诊断专家的五步是 kickoff §6.1.1 已批准的 SOUL 内联工作流，写进 `SOUL.md`，不是 Skill，也不靠 SkillsMiddleware 装载。四份 Skill 资产仍按名字加载：metrics_catalog、analysis_guide、drilldown_playbook、query_tasks。流程 A 保持零 LLM。五步标题是：① read_file 读取本 run 的切片（slice.json）；② 只解读 hit=true 的项（个体优先 / 权重降序；共性带过，不展开）；③ 按契约 write_file interpretation.json（headline / overall / findings / actions / risks，含 data_refs）；④ execute 强制校验（scripts/validate_*.py：结构 + data_refs 数值逐条核对；不过 → 必须改，禁止静默降级）；⑤ 一行收尾（结论 + 命中最重项）。
+5. **MCP connector + Skill 资产**：store-perf 5 工具经 connector 注册；归因思路沉淀在 4 份 Skill 资产（metrics_catalog 为唯一事实源）。已锁定的命中线与权重不按影响文档改写，C-S09 仍是 ≥10%。诊断专家的五步是 kickoff §6.1.1 已批准的 SOUL 内联工作流，写进 `SOUL.md`，不是 Skill，也不靠 SkillsMiddleware 装载。四份 Skill 资产仍按名字加载：metrics_catalog、analysis_guide、drilldown_playbook、query_tasks。流程 A 保持零 LLM。五步标题是：① read_file 读取本 run 的切片（slice.json）；② 只解读 hit=true 的项（个体优先 / 权重降序；共性带过，不展开）；③ 按契约 write_file interpretation.json（headline / overall / findings / actions / risks，含 data_refs）；④ execute 强制校验（scripts/validate_*.py：结构 + data_refs 数值逐条核对；不过 → 必须改，禁止静默降级）；⑤ 一行收尾（结论 + 命中最重项）。
 6. **固定数据链路**：SQL 由受控模板、指标白名单、字段白名单、参数绑定和分区裁剪构造；LLM 不生成或改写 SQL。语义层 YAML 仅作为指标、表、维度和时间语义的口径资产，不引入其 RAG 检索运行时。
-7. **版本化预加载**：定时触发只幂等发起 preload 并立即返回 job；后台任务读取 MaxCompute 固定数据集，写入版本化快照并记录 row counts 与终态。分析只消费 `COMPLETED` 且行数大于 0 的版本；`RUNNING` 禁止重复补数，`FAILED` 允许人工重试。
+7. **预加载状态**：定时触发只幂等发起 preload 并立即返回 job；后台任务读取 MaxCompute 固定数据集，写入快照并记录 row counts 与终态。快照路径没有版本段，仍是 `{data_dir}/{shop_id}.json`。分析只消费 `COMPLETED` 且行数大于 0 的预加载；`RUNNING` 禁止重复补数，`FAILED` 允许人工重试。
 8. **thread 命名与并发**：归因会话命名 `diag:{run_id}:{store_id}:a{attempt}`；全局 Semaphore（默认 3~5，配置化）限制并发，纯数据节点不占槽。
 9. **报告确定性合成**：summarize 只拼装快照数字与已校验结论；失败降级为列表拼接并在附录标注。
 10. **前端走既有分层**：`dashboard/src/api/` 封装 + 页面组件 + i18n 双语键；构建产物由 `make build-frontend` 生成。
@@ -44,7 +44,7 @@
 ## Risks / Trade-offs
 
 - [MaxCompute / 数据服务不可达] → ensure_data_ready 超时策略 + 联调前置检查 + UAT 备样例数据集。
-- [attempt 多行化迁移回归风险] → 第二批独立迁移 + db 回归测试 + 版本断言逐批递增。
+- [把未发布的诊断 DDL 拆成 022 / 023] → 已折进 021 / v21。不新造批次头表、五阶段状态列或取消字段。
 - [LLM 编造数字] → schema 校验 + data_refs 核对 + FAIL 重试；禁止静默降级。
 - [订单表 shop_id 与绩效表 store_id 口径不一致] → 下钻 SQL 测试同时覆盖两套键名。
 - [demo 语义层、架构 wiki 与飞书需求漂移] → 验收以飞书需求文档为准；环比算法与下滑分档以 2026-10-16 截图为绑定规则，黄标以飞书看板五项为准，并写入 specs。架构 wiki 不完整时不阻塞。data_agent 只作为非黄标指标的表、指标、SQL 和处理逻辑参考。
@@ -53,7 +53,7 @@
 
 ## Migration Plan
 
-1. 按 021 → 022 → 023 顺序落迁移，每批更新 `tests/unit/db/test_db_pool.py` 版本断言并跑 db 回归。
+1. 诊断迁移只有 `021_diagnosis_runs` 这一对。`tests/unit/db/test_db_pool.py` 的水位断言是 v21。不按 022、023 再开批次。
 2. 编排 / API / Agent / UI 按模块分支合入 `feature/store-diagnosis`，合并顺序：DB+Data → Orchestrator → API → Agent → UI → E2E。
 3. 上线先本机直跑部署冒烟（`octop run` + Cron 13:00 链路，不引入 Docker/compose 作为验证前置），再真实数据小批次联调。人工验收签字等待需求文档写出 UAT / 验收条文之后再进行；当前不自拟签字清单。
 4. 回滚：迁移成对且幂等，失败回退上一版本断言；Cron 挂点可配置关闭，不影响既有主路径。
