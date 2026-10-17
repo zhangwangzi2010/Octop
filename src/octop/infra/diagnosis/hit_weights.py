@@ -153,6 +153,24 @@ def reply_rate_contrast_spelling() -> str:
     return "24小时回复率"
 
 
+_LEAF_ALIASES: dict[str, str] = {
+    "用户评价": "用户评价分",
+    "48小时发货率": "延迟发货率",
+    "24小时回复率": "24 小时回复率",
+}
+
+
+def locked_metric_name(name: str) -> str | None:
+    """Read-only leaf alias. JSON keys stay the locked spellings.
+
+    活动覆盖率 is not 活动报名率. 缺货率 stays the locked name.
+    """
+    for metric in _METRICS.values():
+        if metric.name == name:
+            return name
+    return _LEAF_ALIASES.get(name)
+
+
 def common_hit_rate(hit_store_count: int, eligible_store_count: int) -> float:
     """Hit stores divided by stores that have a value and are not a yellow gap."""
     return hit_store_count / eligible_store_count

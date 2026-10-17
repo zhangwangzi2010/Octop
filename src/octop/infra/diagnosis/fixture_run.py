@@ -41,7 +41,6 @@ from octop.infra.diagnosis.symptom_engine import (
 _GAPS: tuple[str, ...] = (
     "analysis_guide 分流表没有正文",
     "一级派生展示值不从快照现算",
-    "二级清单叶名与锁定指标名不一致，判定读取快照 metrics 的锁定名",
 )
 _PHASES: tuple[str, ...] = ("SKIP", "individual", "commonality")
 _PRIORITIES: tuple[str, ...] = ("P0", "P1", "P2")

@@ -21,6 +21,7 @@ from octop.infra.diagnosis.fetch_catalog import (
 from octop.infra.diagnosis.hit_weights import (
     document_denominator,
     document_numerator,
+    locked_metric_name,
     metric_ids,
     metric_name,
 )
@@ -313,8 +314,9 @@ def _level2(metrics: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
         if leaf in yellow:
             items.append(_yellow_item(leaf, checklist))
             continue
-        incoming = metrics.get(leaf)
-        if leaf in keys and isinstance(incoming, Mapping):
+        resolved = locked_metric_name(leaf)
+        incoming = metrics.get(resolved) if isinstance(resolved, str) else None
+        if isinstance(resolved, str) and resolved in keys and isinstance(incoming, Mapping):
             items.append(_metric_item(checklist, leaf, incoming))
             continue
         items.append(_gap_item(checklist, leaf))
