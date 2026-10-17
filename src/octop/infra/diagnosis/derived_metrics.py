@@ -7,8 +7,13 @@ PoP severity bands stay in ``pop_rules`` and are not retuned here.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
+
+from octop.infra.diagnosis.l1_semantic import age_bands
+from octop.infra.diagnosis.pop_rules import pop_percent
 
 _DERIVED_LABEL = "派生在诊断侧、语义层无同名 metric"
 _DERIVED_SLICES: tuple[str, ...] = ("Top", "品类", "售龄")
@@ -81,6 +86,102 @@ def decline_weight_index(
     if contribution is None:
         return None
     return abs(contribution) * entity_previous / slice_previous_total
+
+
+@dataclass(frozen=True)
+class MeasureWindow:
+    """Current and previous values for one GMV or quantity measure."""
+
+    current: float
+    previous: float
+    slice_changes: tuple[float, ...] = ()
+    slice_previous_total: float | None = None
+
+
+_GAP_DISPLAYS: tuple[str, ...] = (
+    "订单量下滑占比",
+    "下滑SPU数占比",
+    "动销SPU下滑占比",
+    "在售SPU下滑占比",
+    "Top x 下滑款清单",
+    "Top x GMV环比下滑幅度",
+    "Top x 销量环比下滑幅度",
+    "Top x 上期GMV占比",
+    "Top x 上期销量占比",
+    "Top x 本期GMV占比",
+    "Top x 本期销量占比",
+    "Top x GMV 下滑贡献占比",
+    "Top x 销量下滑贡献占比",
+    "GMV下滑权重指数",
+    "销量下滑权重指数",
+    "品类下滑幅度",
+    "品类下滑贡献占比",
+)
+_GAP_MARK = "gap"
+
+
+def measure_result(kind: str, window: MeasureWindow) -> dict[str, float | None]:
+    """Pop, contribution, and weight index. A zero previous pop is not a number."""
+    change = period_change(window.current, window.previous)
+    contribution = None
+    if window.slice_changes:
+        contribution = decline_contribution(kind, change, window.slice_changes)
+    total = window.slice_previous_total
+    weight_index = None
+    if isinstance(total, (int, float)) and not isinstance(total, bool) and total != 0:
+        weight_index = decline_weight_index(contribution, window.previous, total)
+    return {
+        "pop": pop_percent(window.current, window.previous),
+        "contribution": contribution,
+        "weight_index": weight_index,
+    }
+
+
+def live_minimal(
+    *,
+    overall: Mapping[str, Any] | None = None,
+    slices: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Runtime values for the locked formulas. Missing inputs stay empty."""
+    overall_windows = overall or {}
+    displays = {
+        "GMV环比下滑幅度": _display_pop(overall_windows.get(gmv_field())),
+        "销量环比下滑幅度": _display_pop(overall_windows.get(quantity_field())),
+    }
+    return {
+        "displays": displays,
+        "gaps": _GAP_DISPLAYS,
+        "gap_mark": _GAP_MARK,
+        "slices": _live_slices(slices or {}),
+        "top_x": None,
+    }
+
+
+def _display_pop(window: object) -> float | None:
+    if not isinstance(window, MeasureWindow):
+        return None
+    return pop_percent(window.current, window.previous)
+
+
+def _live_slices(
+    slices: Mapping[str, Any],
+) -> dict[str, dict[str, dict[str, float | None]]]:
+    computed: dict[str, dict[str, dict[str, float | None]]] = {}
+    for kind, measures in slices.items():
+        if not _slice_accepted(str(kind)) or not isinstance(measures, Mapping):
+            continue
+        kind_result: dict[str, dict[str, float | None]] = {}
+        for field in (gmv_field(), quantity_field()):
+            window = measures.get(field)
+            if isinstance(window, MeasureWindow):
+                kind_result[field] = measure_result(str(kind), window)
+        if kind_result:
+            computed[str(kind)] = kind_result
+    return computed
+
+
+def _slice_accepted(kind: str) -> bool:
+    return kind in {"Top", "品类"} or kind in age_bands()
 
 
 def _sign(value: float) -> int:
