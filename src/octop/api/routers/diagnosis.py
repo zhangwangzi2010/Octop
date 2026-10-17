@@ -7,6 +7,11 @@ from pydantic import BaseModel, Field
 
 from octop.api.deps import current_user, get_server
 from octop.infra.db.repos.diagnosis_runs import DiagnosisRunRow, DiagnosisRunsRepo
+from octop.infra.diagnosis.fixture_run import (
+    cancel_fixture_task,
+    fixture_report,
+    schedule_fixture_run,
+)
 from octop.infra.diagnosis.orchestrator import DiagnosisOrchestrator
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.server import OctopServer
@@ -27,6 +32,7 @@ class DiagnosisRunCreate(BaseModel):
     preload_status: str = Field(min_length=1)
     row_count: int = Field(ge=0)
     snapshot_text: str
+    data_dir: str | None = None
 
 
 class DiagnosisItemOut(BaseModel):
@@ -42,6 +48,17 @@ class DiagnosisRunOut(BaseModel):
     stages: list[str]
     llm_calls: int
     conclusion: str
+
+
+class DiagnosisReportOut(BaseModel):
+    run_id: str
+    partial: bool
+    appendix: list[str]
+    sections: list[str]
+    body: str
+    numbers: list[float]
+    llm_calls: int
+    ready: bool
 
 
 def _orchestrator(server: OctopServer) -> DiagnosisOrchestrator:
@@ -108,6 +125,8 @@ async def create_diagnosis_run(
     )
     if existing is not None:
         return _view(repo, existing)
+    if body.data_dir:
+        return _schedule_snapshot_run(body, user, repo)
 
     result = _orchestrator(server).submit(
         client_request_id=body.client_request_id,
@@ -156,6 +175,82 @@ async def create_diagnosis_run(
         raise OctopError(ErrorCode.NOT_FOUND, "diagnosis run not found")
     viewed = _view(repo, stored)
     return viewed.model_copy(update={"llm_calls": int(result["llm_calls"])})
+
+
+def _schedule_snapshot_run(
+    body: DiagnosisRunCreate,
+    user: User,
+    repo: DiagnosisRunsRepo,
+) -> DiagnosisRunOut:
+    """Start a background run that reads snapshots from ``data_dir``."""
+    data_dir = body.data_dir
+    if not data_dir:
+        raise OctopError(ErrorCode.NOT_FOUND, "diagnosis snapshot directory is missing")
+    run_id = new_ulid()
+    repo.create_run(
+        run_id=run_id,
+        owner_user_id=user.id,
+        client_request_id=body.client_request_id,
+        status="PREPARING",
+    )
+    for store_id in body.stores:
+        repo.create_item(
+            item_id=new_ulid(),
+            run_id=run_id,
+            store_id=store_id,
+            attempt=1,
+            status="PENDING",
+        )
+    stored = repo.get_run(run_id)
+    if stored is None:
+        raise OctopError(ErrorCode.NOT_FOUND, "diagnosis run not found")
+    viewed = _view(repo, stored)
+    schedule_fixture_run(
+        run_id=run_id,
+        data_dir=data_dir,
+        stores=body.stores,
+        repo=repo,
+        preload_status=body.preload_status,
+        row_count=body.row_count,
+    )
+    return viewed.model_copy(update={"llm_calls": 0})
+
+
+@router.get(
+    "/diagnosis/runs/{run_id}/report",
+    summary="Read a diagnosis report",
+    response_model=DiagnosisReportOut,
+)
+async def read_diagnosis_report(
+    run_id: str,
+    user: User = Depends(current_user),
+    server: OctopServer = Depends(get_server),
+) -> DiagnosisReportOut:
+    """Return the report written by a background snapshot run."""
+    repo = _repo(server)
+    _require_run(repo, run_id, user)
+    stored = fixture_report(run_id)
+    if stored is None:
+        return DiagnosisReportOut(
+            run_id=run_id,
+            partial=False,
+            appendix=[],
+            sections=[],
+            body="",
+            numbers=[],
+            llm_calls=0,
+            ready=False,
+        )
+    return DiagnosisReportOut(
+        run_id=str(stored["run_id"]),
+        partial=bool(stored["partial"]),
+        appendix=[str(item) for item in stored["appendix"]],
+        sections=[str(item) for item in stored["sections"]],
+        body=str(stored["body"]),
+        numbers=[float(item) for item in stored["numbers"]],
+        llm_calls=int(stored["llm_calls"]),
+        ready=bool(stored["ready"]),
+    )
 
 
 @router.get(
@@ -207,6 +302,7 @@ async def cancel_diagnosis_run(
         raise OctopError(ErrorCode.FORBIDDEN, "diagnosis run is not running")
     repo.update_run_status(run_id, "CANCELLED")
     repo.cancel_unfinished_items(run_id)
+    await cancel_fixture_task(run_id)
     _orchestrator(server).release_attribution()
     updated = repo.get_run(run_id)
     if updated is None:
