@@ -154,7 +154,9 @@ class StorePerfClient:
         method, path = tool_http(tool)
         timeout = tool_timeout_seconds(tool)
         url = self._base_url + path
-        headers = {"Authorization": f"Bearer {self._api_key}"}
+        headers: dict[str, str] = {}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
         with httpx.Client(transport=self._transport, timeout=httpx.Timeout(timeout)) as client:
             if method == "GET":
                 response = client.get(url, params=_query(body), headers=headers)
@@ -170,10 +172,10 @@ def client_from_env(
     *,
     transport: httpx.BaseTransport | None = None,
 ) -> StorePerfClient:
-    """Build a client from the service key and base URL."""
+    """Build a client from the base URL. An empty key is the unauthenticated service."""
     key = environ.get(API_KEY_ENV, "").strip()
     url = environ.get(BASE_URL_ENV, "").strip()
-    if not key or not url:
+    if not url:
         raise StorePerfError("missing_config")
     return StorePerfClient(base_url=url, api_key=key, transport=transport)
 
