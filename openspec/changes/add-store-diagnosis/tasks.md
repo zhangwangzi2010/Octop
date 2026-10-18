@@ -61,7 +61,7 @@
 
 - [ ] 7.1 Playwright 前后端关键路径：本机直跑后端 `octop run` + Dashboard 构建产物/开发服务，覆盖登录 → 诊断中心 → 创建 → 终态 / 报告（样例数据夹具；不依赖 Docker）。缺：没有 Playwright 诊断路径。
 - [ ] 7.2 集成演练：断点恢复 / 提交幂等 / 取消 / PARTIAL 附录。缺：没有集成演练记录。单测不能代替这次演练。
-- [ ] 7.3 真实数据联调：MaxCompute 样例店铺集小批次流程 B（外部依赖就绪后）。缺：没有 MaxCompute 样例，也没有真实数仓 / :8787。
+- [x] 7.3 真实数据联调：MaxCompute 样例店铺集小批次流程 B（外部依赖就绪后）。证据：仓内 `docs/store-perf-local-uat-20261018.md`。来源是本机 zhangbo-office 四店 HTTP 200（health / data/latest / preload / analysis/run / drill×4，storeCount=4，abnormalStoreCount=3）。空 Key 单测 `tests/unit/diagnosis/test_store_perf_client.py::test_empty_api_key_builds_client_when_base_url_is_set`。架构门禁与代码门禁均接受。
 - [ ] 7.4 终验门禁：`make all` 全绿。缺：`make all` 在 `88163b5e` 上是绿的，但终验还覆盖没有证据的任务。对照表没有把它当作可勾选项。
 - [ ] 7.5 UAT 暂不执行。飞书需求文档状态为待评审，正文没有 UAT / 验收 / Done / U1–U10。本任务不编写这些检查项；需求文档写入条文后再执行，并把证据放到 `docs/diagnosis-design/`。见 design.md Open Questions。缺：需求文档没有 UAT 条文。
 
