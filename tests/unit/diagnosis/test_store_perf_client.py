@@ -128,6 +128,42 @@ def test_env_placeholders_have_no_odps_secret() -> None:
     assert raised.value.code == "missing_config"
 
 
+def test_empty_api_key_builds_client_when_base_url_is_set() -> None:
+    """有 base URL 时空 Key 可以建客户端。缺 URL 仍是 missing_config。"""
+    module = _mod()
+    seen: dict[str, Any] = {}
+
+    def latest(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(
+            200,
+            json=_ok(performance_table(), ["store_id"], [{"store_id": "634418230343667"}]),
+        )
+
+    client = module.client_from_env(
+        {
+            module.BASE_URL_ENV: "http://127.0.0.1:8787",
+            module.API_KEY_ENV: "",
+        },
+        transport=httpx.MockTransport(latest),
+    )
+    result = client.call(
+        "get_data_latest",
+        {"store": "634418230343667", "window": {"start": "2026-10-11", "end": "2026-10-17"}},
+    )
+    assert seen["auth"] is None
+    assert result["read_only"] is True
+    assert result["rows"] == [{"store_id": "634418230343667"}]
+    blank = module.client_from_env({module.BASE_URL_ENV: "http://127.0.0.1:8787"})
+    assert blank is not None
+    with pytest.raises(module.StorePerfError) as raised:
+        module.client_from_env({module.API_KEY_ENV: "present"})
+    assert raised.value.code == "missing_config"
+    with pytest.raises(module.StorePerfError) as raised:
+        module.client_from_env({module.BASE_URL_ENV: "   "})
+    assert raised.value.code == "missing_config"
+
+
 def test_timeouts_tools_and_catalog_stay_coming_soon() -> None:
     """五个工具沿用目录名。预加载、下钻、分析超时不超过设计值。"""
     module = _mod()
