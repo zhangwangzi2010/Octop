@@ -35,6 +35,7 @@ from octop.infra.diagnosis.hit_weights import (
     total_weight,
 )
 from octop.infra.diagnosis.pop_rules import pop_direction
+from octop.infra.diagnosis.remaining_contracts import chosen_detail_limit
 from octop.infra.diagnosis.snapshot_store import read_snapshot, read_store_fetch
 from octop.infra.diagnosis.snapshot_structure import preload_consumable
 from octop.infra.diagnosis.symptom_engine import (
@@ -47,6 +48,8 @@ from octop.infra.diagnosis.symptom_engine import (
 _GAPS: tuple[str, ...] = ("一级派生展示值不从快照现算",)
 _PHASES: tuple[str, ...] = ("SKIP", "individual", "commonality")
 _PRIORITIES: tuple[str, ...] = ("P0", "P1", "P2")
+_APPENDIX: frozenset[str] = frozenset({"FAILED", "SKIPPED"})
+_DETAIL_SHEETS: frozenset[str] = frozenset({"评价", "售后", "发货", "到货"})
 FakeLlm = Callable[[str, tuple[object, ...]], Mapping[str, Any]]
 _TASKS: dict[str, asyncio.Task[None]] = {}
 _REPORTS: dict[str, dict[str, Any]] = {}
@@ -485,9 +488,7 @@ def _groups(
     common: frozenset[str],
 ) -> dict[str, tuple[str, ...]]:
     grouped: dict[str, list[str]] = {name: [] for name in _PRIORITIES}
-    for row in rows:
-        if row["role"] != "individual":
-            continue
+    for row in _ranked_individuals(rows, common):
         hits = _hit_ids(row)
         priority = individual_priority(individual_weight(hits, common), float(row["score"]))
         grouped[priority].append(str(row["store_id"]))
@@ -495,15 +496,26 @@ def _groups(
 
 
 def _top5(rows: Sequence[Mapping[str, Any]], common: frozenset[str]) -> tuple[str, ...]:
-    ranked = [row for row in rows if row["role"] == "individual"]
-    ranked.sort(
-        key=lambda row: (
-            -individual_weight(_hit_ids(row), common),
-            -total_weight(_hit_ids(row)),
-            float(row["score"]),
-        )
-    )
+    ranked = _ranked_individuals(rows, common)
     return tuple(str(row["store_id"]) for row in ranked[:5])
+
+
+def _ranked_individuals(
+    rows: Sequence[Mapping[str, Any]],
+    common: frozenset[str],
+) -> list[Mapping[str, Any]]:
+    ranked = [row for row in rows if row["role"] == "individual"]
+    ranked.sort(key=lambda row: _rank_key(row, common))
+    return ranked
+
+
+def _rank_key(row: Mapping[str, Any], common: frozenset[str]) -> tuple[float, float, float]:
+    hits = _hit_ids(row)
+    return (
+        -individual_weight(hits, common),
+        -total_weight(hits),
+        float(row["score"]),
+    )
 
 
 def _common_names(
@@ -554,10 +566,44 @@ def _body(
     ]
     common_stores.sort(key=lambda row: float(row["score"]))
     for row in common_stores:
-        band = score_band(float(row["score"]))
-        lines.append(f"{row['store_id']} {row['score']} {band}")
+        score = float(row["score"])
+        band = score_band(score)
+        hint = " 高危提示" if score < 3.5 else ""
+        lines.append(f"{row['store_id']} {row['score']} {band}{hint}")
     lines.append(report_sections()[4])
+    for name in common_names:
+        lines.append(f"整改 {name}")
     lines.append(report_sections()[5])
+    for row in _ranked_individuals(rows, common)[:5]:
+        lines.append(str(row["store_id"]))
+        for metric_id in _hits_by_weight(row):
+            lines.append(_evidence_line(row, metric_id))
     for number in numbers:
         lines.append(str(number))
+    for row in rows:
+        status = str(row["status"])
+        if status in _APPENDIX:
+            lines.append(f"{status} {row['store_id']}")
     return "\n".join(lines)
+
+
+def _hits_by_weight(row: Mapping[str, Any]) -> tuple[str, ...]:
+    order = {metric_id: index for index, metric_id in enumerate(metric_ids())}
+    hits = list(_hit_ids(row))
+    hits.sort(key=lambda metric_id: (-metric_weight_percent(metric_id), order[metric_id]))
+    return tuple(hits)
+
+
+def _evidence_line(row: Mapping[str, Any], metric_id: str) -> str:
+    name = metric_name(metric_id)
+    values = row["values"]
+    raw: object = ""
+    if isinstance(values, Mapping):
+        raw = values.get(name, "")
+    route = drill_route(metric_id)
+    if route in _DETAIL_SHEETS:
+        tail = f"sheet {route}"
+    else:
+        tail = undrillable_mark(metric_id) or "无明细下钻能力"
+    limit = chosen_detail_limit()
+    return f"{name} 指标值 {raw} 明细条数 {limit} {tail}"
