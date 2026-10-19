@@ -166,7 +166,8 @@ def test_expert_loads_four_skill_assets_and_soul_steps() -> None:
     loaded = _items(_call("load_skills"))
     assert tuple(item["name"] for item in loaded) == _SKILLS
     assert [item["name"] for item in loaded if item["fact_source"] is True] == ["metrics_catalog"]
-    assert all(item["body"] == "" for item in loaded if item["name"] != "analysis_guide")
+    assert all(str(item["body"]).strip() for item in loaded)
+    assert all("≥2%" not in str(item["body"]) for item in loaded)
     guide = next(item for item in loaded if item["name"] == "analysis_guide")
     assert "无明细下钻能力" in str(guide["body"])
     assert "≥2%" not in str(guide["body"])
