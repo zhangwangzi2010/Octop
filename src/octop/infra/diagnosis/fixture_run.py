@@ -50,7 +50,6 @@ _PHASES: tuple[str, ...] = ("SKIP", "individual", "commonality")
 _PRIORITIES: tuple[str, ...] = ("P0", "P1", "P2")
 _APPENDIX: frozenset[str] = frozenset({"FAILED", "SKIPPED"})
 _DETAIL_SHEETS: frozenset[str] = frozenset({"评价", "售后", "发货", "到货"})
-_WINDOW = "最近 60 天（不含今天）"
 FakeLlm = Callable[[str, tuple[object, ...]], Mapping[str, Any]]
 _TASKS: dict[str, asyncio.Task[None]] = {}
 _REPORTS: dict[str, dict[str, Any]] = {}
@@ -607,4 +606,4 @@ def _evidence_line(row: Mapping[str, Any], metric_id: str) -> str:
     else:
         tail = undrillable_mark(metric_id) or "无明细下钻能力"
     limit = chosen_detail_limit()
-    return f"{name} 指标值 {raw} 明细条数 {limit} 时间范围 {_WINDOW} {tail}"
+    return f"{name} 指标值 {raw} 明细条数 {limit} {tail}"

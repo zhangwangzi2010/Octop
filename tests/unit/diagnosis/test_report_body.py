@@ -6,7 +6,6 @@ triple. PARTIAL lists FAILED and SKIPPED in the body. No real LLM.
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Any
 
 from octop.infra.diagnosis.l1_semantic import yellow_metric_names
@@ -16,10 +15,9 @@ from octop.infra.diagnosis.snapshot_store import (
     performance_table,
     write_snapshot,
 )
-from octop.infra.diagnosis.snapshot_structure import parse_period
 from octop.infra.diagnosis.symptom_engine import score_band
 
-_WINDOW = "最近 60 天（不含今天）"
+_Q3_LABEL = "最近 60 天（不含今天）"
 _DETAIL = chosen_detail_limit()
 
 
@@ -55,7 +53,8 @@ def test_priority_groups_follow_the_top5_weight_key(tmp_path: Any) -> None:
     assert "sheet" not in campaign
     for line in (refund, arrival, campaign):
         assert f"明细条数 {_DETAIL}" in line
-        assert f"时间范围 {_WINDOW}" in line
+        assert "时间范围" not in line
+    _assert_snapshot_has_no_q3_window(data_dir, body)
     assert not any(line.startswith("整改 ") for line in lines)
     assert "高危提示" not in body
     assert "SKIPPED filler" in body.splitlines()
@@ -77,9 +76,6 @@ def test_three_store_body_carries_evidence_partial_and_danger(tmp_path: Any) -> 
         llm=_fake_llm,
     )
     body = str(report["body"])
-    window = parse_period(_WINDOW, today=date(2026, 10, 19))
-    assert isinstance(window, tuple)
-    assert len(window) == 60
     assert report["status"] == "PARTIAL"
     assert report["llm_calls"] == 0
     assert report["appendix"] == ("healthy", "fabricated")
@@ -99,7 +95,8 @@ def test_three_store_body_carries_evidence_partial_and_danger(tmp_path: Any) -> 
     assert "sheet 发货" in ship
     for line in (review, ship):
         assert f"明细条数 {_DETAIL}" in line
-        assert f"时间范围 {_WINDOW}" in line
+        assert "时间范围" not in line
+    _assert_snapshot_has_no_q3_window(data_dir, body)
     skipped = body.index("SKIPPED healthy")
     failed = body.index("FAILED fabricated")
     assert five < skipped < failed
@@ -109,6 +106,14 @@ def test_three_store_body_carries_evidence_partial_and_danger(tmp_path: Any) -> 
     assert 3.4 in report["numbers"]
     assert 0.1 in report["numbers"]
     _assert_no_forbidden(body)
+
+
+def _assert_snapshot_has_no_q3_window(data_dir: Any, body: str) -> None:
+    texts = [path.read_text(encoding="utf-8") for path in data_dir.glob("*.json")]
+    assert texts
+    assert all(_Q3_LABEL not in text for text in texts)
+    assert _Q3_LABEL not in body
+    assert "时间范围" not in body
 
 
 def _assert_no_forbidden(body: str) -> None:
