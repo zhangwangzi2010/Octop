@@ -17,10 +17,11 @@ from octop.infra.diagnosis.symptom_engine import score_band
 
 
 def test_analysis_guide_body_uses_locked_lines() -> None:
-    """分流表正文升格进 Skill。不带回 ≥2%。其余三份正文仍空。"""
+    """分流表正文留在 analysis_guide。不带回 ≥2%。其余三份正文另写，不改这条口径。"""
     loaded = tuple(load_skills())
     guide = next(item for item in loaded if item["name"] == "analysis_guide")
     body = str(guide["body"])
+    assert body == _fn("analysis_guide_body")()
     assert "无明细下钻能力" in body
     assert "≥10%" in body
     assert "≥2%" not in body
@@ -28,7 +29,15 @@ def test_analysis_guide_body_uses_locked_lines() -> None:
         assert name in body
     for name in ("缺货率", "24 小时回复率", "售后准时率", "爆旺款率", "售罄健康分", "活动报名率"):
         assert name in body
-    assert all(item["body"] == "" for item in loaded if item["name"] != "analysis_guide")
+    others = [item for item in loaded if item["name"] != "analysis_guide"]
+    assert [item["name"] for item in others] == [
+        "metrics_catalog",
+        "drilldown_playbook",
+        "query_tasks",
+    ]
+    assert all(str(item["body"]).strip() for item in others)
+    assert all("≥2%" not in str(item["body"]) for item in loaded)
+    assert all(":8787" not in str(item["body"]) for item in loaded)
     assert soul_steps()[0].startswith("① read_file")
 
 

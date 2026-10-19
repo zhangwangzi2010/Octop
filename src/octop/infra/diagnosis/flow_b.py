@@ -52,12 +52,13 @@ def skill_assets() -> tuple[str, ...]:
 
 
 def load_skills() -> tuple[dict[str, Any], ...]:
-    """Load the four assets. Only analysis_guide has the routing table."""
-    guide = analysis_guide_body()
+    """Load the four assets from the diagnosis expert package."""
+    from octop.infra.diagnosis.skill_bodies import read_skill_body
+
     return tuple(
         {
             "name": name,
-            "body": guide if name == "analysis_guide" else "",
+            "body": read_skill_body(name),
             "fact_source": name == "metrics_catalog",
         }
         for name in _SKILL_ASSETS

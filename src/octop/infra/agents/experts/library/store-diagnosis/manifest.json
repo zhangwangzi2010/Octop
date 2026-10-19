@@ -1,0 +1,32 @@
+{
+  "id": "store-diagnosis",
+  "label": {
+    "zh": "店铺诊断专家",
+    "en": "Store Diagnosis Expert"
+  },
+  "description": {
+    "zh": "按已锁定的指标、分流表和五步工作流解读店铺诊断切片。",
+    "en": "Interpret a store-diagnosis slice with the locked metrics, routing table, and five-step workflow."
+  },
+  "welcome_message": {
+    "zh": "给出这次诊断的切片，我只解读已经命中的项",
+    "en": "Share this run's slice and I will interpret only the items that already hit"
+  },
+  "icon_name": "activity",
+  "color": "#0f766e",
+  "prompt_files": [
+    "SOUL.md"
+  ],
+  "task_examples": {
+    "zh": [
+      "每个工作日「13:00」查看店铺诊断报告里的共性问题，有新增再通知我",
+      "对一家特别情况店铺，只解读已经命中的检查项，并核对数字来自当次切片",
+      "每周一「10:00」汇总上周诊断里失败和跳过的店铺"
+    ],
+    "en": [
+      "Every weekday at 13:00, read the common issues in the store diagnosis report and notify me only when something new appears",
+      "For one special-case store, interpret only the checklist items that already hit and check that the numbers come from that run's slice",
+      "Every Monday at 10:00, summarize last week's failed and skipped stores from the diagnosis runs"
+    ]
+  }
+}
