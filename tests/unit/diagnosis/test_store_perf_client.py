@@ -164,12 +164,12 @@ def test_empty_api_key_builds_client_when_base_url_is_set() -> None:
     assert raised.value.code == "missing_config"
 
 
-def test_timeouts_tools_and_catalog_stay_coming_soon() -> None:
-    """五个工具沿用目录名。预加载、下钻、分析超时不超过设计值。"""
+def test_timeouts_tools_and_catalog_are_available() -> None:
+    """五个工具沿用目录名。目录阶段是 available。超时不超过设计值。"""
     module = _mod()
     entry = get_catalog_entry("store-perf")
     assert entry is not None
-    assert entry.phase == "coming_soon"
+    assert entry.phase == "available"
     assert entry.allowed_tools == module.tool_names()
     assert module.tool_names() == (
         "get_data_latest",

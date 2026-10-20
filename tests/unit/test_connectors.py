@@ -959,13 +959,13 @@ def test_every_catalog_entry_has_category():
 
 
 def test_store_perf_catalog_uses_api_key_doc_and_icon():
-    """store-perf 的认证、文档和图标使用已定值，阶段保持 coming_soon。"""
+    """store-perf 的认证、文档和图标使用已定值，阶段是 available。"""
     entry = get_catalog_entry("store-perf")
     assert entry is not None
     assert entry.auth_kind == "api_key"
     assert entry.doc_url == "https://ucnbkepnx9u9.feishu.cn/wiki/UGlmwS7rsiqRs2kKpcEcLwuInbU"
     assert entry.icon == "store-perf"
-    assert entry.phase == "coming_soon"
+    assert entry.phase == "available"
     assert entry.allowed_tools == (
         "get_data_latest",
         "submit_preload",

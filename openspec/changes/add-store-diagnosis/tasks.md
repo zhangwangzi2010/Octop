@@ -44,7 +44,7 @@
   - ④ execute 强制校验（scripts/validate_*.py：结构 + data_refs 数值逐条核对；不过 → 必须改，禁止静默降级）
   - ⑤ 一行收尾（结论 + 命中最重项）
   证据：SOUL `src/octop/infra/agents/experts/library/store-diagnosis/SOUL.md`；Skill 同目录 `skills/metrics_catalog`、`analysis_guide`、`drilldown_playbook`、`query_tasks` 的 `SKILL.md`；尖端 `20cdc132`；测试 `tests/unit/diagnosis/test_skill_bodies.py`。架构门禁与代码门禁均接受。
-- [ ] 5.3 store-perf MCP connector：5 工具注册与配置；入参透传 run_id / store_id。缺：目录字段有测试，阶段仍是 `coming_soon`。真实数仓 / :8787 没有实现，入参透传没有点名测试。
+- [x] 5.3 store-perf MCP connector：5 工具注册与配置；入参透传 run_id / store_id。catalog `store-perf` 为 `available`。五个工具名未改：`get_data_latest`、`submit_preload`、`run_analysis`、`drill_metric`、`get_report`。编排调用已有 `store_perf_client`。`run_id` / `store_id` 透传。点名测试 `tests/unit/diagnosis/test_store_perf_nodes.py::test_store_perf_catalog_is_available_with_the_same_five_tools`、`tests/unit/diagnosis/test_store_perf_nodes.py::test_nodes_pass_run_id_and_store_id_through_the_existing_client`。尖端 `5df0aab7`。架构门禁与代码门禁均接受。
 - [ ] 5.4 两段式 diagnose + attempt+1 换会话 + thread 命名 `diag:{run_id}:{store_id}:a{attempt}`。缺：对照表有 `test_flow_b.py` 与 `test_fixture_run.py`，没有点名提交。
 - [x] 5.5 报告五段合成 summarize + PARTIAL 附录 + 失败降级拼接。证据：提交 `d705907e`；测试 `tests/unit/diagnosis/test_fixture_run.py::test_three_store_fixture_reaches_partial_from_snapshot_files`。
 - [ ] 5.6 fake agent 全链路集成测试（`tests/integration/test_diagnosis_integration.py`）。缺：对照表有这个测试文件，没有点名提交。
