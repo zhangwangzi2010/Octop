@@ -15,6 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from octop.infra.diagnosis.snapshot_structure import preload_consumable, symptom_conclusion
+from octop.infra.diagnosis.store_perf_client import StorePerfClient
 
 _STAGE_NAMES: tuple[str, ...] = (
     "PREPARING",
@@ -36,6 +37,13 @@ _RETRY: dict[str, Mapping[str, int]] = {
     "diagnose 段1": {"timeout_seconds": 60, "max_attempts": 2},
     "summarize": {"timeout_seconds": 600},
 }
+_PERF_NODES: tuple[tuple[str, str], ...] = (
+    ("ensure_data_ready", "get_data_latest"),
+    ("ensure_data_ready", "submit_preload"),
+    ("analysis_run", "run_analysis"),
+    ("drill_metric", "drill_metric"),
+    ("summarize", "get_report"),
+)
 
 DataGate = Callable[[str, int], bool]
 AnalysisPort = Callable[[str], str]
@@ -121,12 +129,14 @@ class DiagnosisOrchestrator:
         analysis: AnalysisPort | None = None,
         llm: LlmPort | None = None,
         orphans: Sequence[Mapping[str, Any]] | None = None,
+        store_perf: StorePerfClient | None = None,
     ) -> None:
         self._limit = attribution_limit
         self._held = 0
         self._data_gate = preload_consumable if data_gate is None else data_gate
         self._analysis = symptom_conclusion if analysis is None else analysis
         self._llm = llm
+        self._store_perf = store_perf
         self._runs: dict[str, dict[str, Any]] = {}
         self._by_client: dict[str, str] = {}
         self._reset_calls = 0
@@ -178,6 +188,9 @@ class DiagnosisOrchestrator:
         row_count: int,
         snapshot_text: str,
         checkpoint: str | None = None,
+        window: Mapping[str, str] | None = None,
+        drill_metric: str | None = None,
+        drill_top: int | None = None,
     ) -> dict[str, Any]:
         """Start flow A, or return the run already stored for this request id."""
         existing = self._by_client.get(client_request_id)
@@ -188,11 +201,21 @@ class DiagnosisOrchestrator:
 
         run_id = f"run-{len(self._runs) + 1}"
         items = [{"store_id": store_id} for store_id in stores]
+        finishing = checkpoint == "ANALYZING" or self._ensure_data_ready(preload_status, row_count)
+        perf_calls: tuple[dict[str, Any], ...] = ()
+        if finishing:
+            perf_calls = self._store_perf_calls(
+                run_id=run_id,
+                stores=stores,
+                window=window,
+                drill_metric=drill_metric,
+                drill_top=drill_top,
+            )
         if checkpoint == "ANALYZING":
             stages, state, conclusion = self._finish_from("ANALYZING", snapshot_text)
             analysis_called = True
             events: list[dict[str, Any]] = []
-        elif self._ensure_data_ready(preload_status, row_count):
+        elif finishing:
             stages, state, conclusion = self._finish_from("PREPARING", snapshot_text)
             analysis_called = True
             events = []
@@ -212,6 +235,7 @@ class DiagnosisOrchestrator:
             "conclusion": conclusion,
             "analysis_called": analysis_called,
             "events": events,
+            "store_perf_calls": perf_calls,
         }
         self._runs[run_id] = record
         self._by_client[client_request_id] = run_id
@@ -259,6 +283,43 @@ class DiagnosisOrchestrator:
 
     def _ensure_data_ready(self, status: str, row_count: int) -> bool:
         return bool(self._data_gate(status, row_count))
+
+    def _store_perf_calls(
+        self,
+        *,
+        run_id: str,
+        stores: Sequence[str],
+        window: Mapping[str, str] | None,
+        drill_metric: str | None,
+        drill_top: int | None,
+    ) -> tuple[dict[str, Any], ...]:
+        client = self._store_perf
+        if client is None:
+            return ()
+        if window is None or drill_metric is None or drill_top is None:
+            raise ValueError("store-perf call needs window, metric, and top")
+        calls: list[dict[str, Any]] = []
+        for store_id in stores:
+            for node, tool in _PERF_NODES:
+                params: dict[str, object] = {"store": store_id, "window": dict(window)}
+                if tool == "drill_metric":
+                    params["metric"] = drill_metric
+                    params["top"] = drill_top
+                calls.append(
+                    {
+                        "node": node,
+                        "tool": tool,
+                        "run_id": run_id,
+                        "store_id": store_id,
+                        "args": {
+                            "run_id": run_id,
+                            "store_id": store_id,
+                            **params,
+                        },
+                        "result": client.call(tool, params),
+                    }
+                )
+        return tuple(calls)
 
     def _finish_from(self, start: str, snapshot_text: str) -> tuple[list[str], str, str]:
         state = start

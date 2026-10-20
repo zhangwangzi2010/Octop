@@ -96,7 +96,7 @@ def test_fake_agent_flow_b_keeps_flow_a_free_of_llm() -> None:
     assert entry.auth_kind == "api_key"
     assert entry.doc_url == "https://ucnbkepnx9u9.feishu.cn/wiki/UGlmwS7rsiqRs2kKpcEcLwuInbU"
     assert entry.icon == "store-perf"
-    assert entry.phase == "coming_soon"
+    assert entry.phase == "available"
     visible = " ".join(
         part for part in (entry.description, entry.auth_hint) if isinstance(part, str)
     )
